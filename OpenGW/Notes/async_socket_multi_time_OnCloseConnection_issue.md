@@ -26,7 +26,7 @@ When the client socket shutdowns, it is both sending & receiving.
 - Sending ends with error (with `SocketError = OperationAborted`), 
   Invoking client's `OnCloseConnection(OperationAborted)`
 
-#### Workaround
+#### Workaround **(DONE)**
 - Add an internal dictionary: to make sure every client is 
   invoked with `OnCloseConnection()` just once. 
   <br>(However, `OnSend()` or `OnReceive()` after `OnCloseConnection()` could happen)

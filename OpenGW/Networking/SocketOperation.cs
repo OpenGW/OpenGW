@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 
 namespace OpenGW.Networking
@@ -29,6 +31,9 @@ namespace OpenGW.Networking
         
         
         private const int RECEIVE_BUFFER_LENGTH = 4096;
+        
+        private static readonly ConcurrentDictionary<Socket, bool> s_ActiveConnectedSockets 
+            = new ConcurrentDictionary<Socket, bool>();
         
         private static readonly Pool<SocketAsyncEventArgs> s_ReceivePool;
         private static readonly Pool<SocketAsyncEventArgs> s_SendPool;
@@ -111,6 +116,9 @@ namespace OpenGW.Networking
                 // Callback: OnAccept()
                 token.ClientOrServer.OnAccept(token.Socket, saea.AcceptSocket);
                 
+                // Add accepted socket to active sockets
+                s_ActiveConnectedSockets.TryAdd(saea.AcceptSocket, true);  // true is dummy
+
                 // Start receving on the accepted socket
                 SocketOperation.StartReceive(token.ClientOrServer, saea.AcceptSocket);
                 
@@ -154,6 +162,9 @@ namespace OpenGW.Networking
             {
                 Debug.Assert(object.ReferenceEquals(saea.ConnectSocket, token.Socket));
                 token.ClientOrServer.OnConnect(token.Socket);
+                
+                // Add connected socket to active sockets
+                s_ActiveConnectedSockets.TryAdd(token.Socket, true);  // true is dummy
                 
                 // Start receving on the accepted socket
                 SocketOperation.StartReceive(token.ClientOrServer, token.Socket);
@@ -427,6 +438,13 @@ namespace OpenGW.Networking
         
         private static void CloseSocketConnection(SocketUserToken token, SocketError error)
         {
+            if (!s_ActiveConnectedSockets.TryRemove(token.Socket, out bool dummy))
+            {
+                // This socket is not in the active sockets set.
+                // It must have been called CloseSocketConnection()
+                return;
+            }
+            
             try
             {
                 token.Socket.Dispose();

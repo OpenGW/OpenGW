@@ -116,7 +116,7 @@ namespace OpenGW
             // To close
             //
             clientSocket.Shutdown(SocketShutdown.Both);            
-            Thread.Sleep(1000);
+            //Thread.Sleep(1000);
             clientSocket.Dispose();
             
             serverSocket.Dispose();
