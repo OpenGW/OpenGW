@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using System.Security;
 
 namespace OpenGW.Networking
 {
@@ -30,9 +29,6 @@ namespace OpenGW.Networking
         
         
         private const int RECEIVE_BUFFER_LENGTH = 4096;
-        
-        private static LingerOption LingerStateCloseImmediately { get; } = new LingerOption(true, 0);
-
         
         private static readonly Pool<SocketAsyncEventArgs> s_ReceivePool;
         private static readonly Pool<SocketAsyncEventArgs> s_SendPool;
@@ -112,9 +108,6 @@ namespace OpenGW.Networking
 
             if (saea.SocketError == SocketError.Success)
             {
-                // Set the newly accepted socket NOT to linger
-                saea.AcceptSocket.LingerState = SocketOperation.LingerStateCloseImmediately;
-                
                 // Callback: OnAccept()
                 token.ClientOrServer.OnAccept(token.Socket, saea.AcceptSocket);
                 
@@ -293,9 +286,6 @@ namespace OpenGW.Networking
 
         public static void StartAccept(ISocketEvent server, Socket listenerSocket)
         {
-            // Set the listener NOT to linger
-            listenerSocket.LingerState = SocketOperation.LingerStateCloseImmediately;
-            
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
             saea.Completed += SocketOperation.SocketAsyncEventArgs_OnCompleted;
 
@@ -313,9 +303,6 @@ namespace OpenGW.Networking
 
         public static void StartConnect(ISocketEvent client, Socket clientSocket, IPEndPoint remoteEp)
         {
-            // Set the client NOT to linger
-            clientSocket.LingerState = SocketOperation.LingerStateCloseImmediately;
-
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
             saea.Completed += SocketOperation.SocketAsyncEventArgs_OnCompleted;
 

@@ -108,16 +108,15 @@ namespace OpenGW
             // To send/receive
             //
             const int OFFSET = 10;
-            byte[] buffer = new byte[OFFSET + 1000 * 1000 * 1000];
+            byte[] buffer = new byte[OFFSET + 10 * 1000 * 1000];
             SocketOperation.StartSend(client, clientSocket, buffer, OFFSET, buffer.Length - OFFSET);
-
-            Thread.Sleep(1000);
             
             
             //
             // To close
             //
             clientSocket.Shutdown(SocketShutdown.Both);            
+            Thread.Sleep(1000);
             clientSocket.Dispose();
             
             serverSocket.Dispose();
