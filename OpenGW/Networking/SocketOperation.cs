@@ -307,8 +307,19 @@ namespace OpenGW.Networking
             };
 
             Debug.Assert(saea.AcceptSocket == null);
-            
-            SocketOperation.StartAcceptInternal(saea);
+
+            try
+            {
+                SocketOperation.StartAcceptInternal(saea);
+            }
+            catch
+            {
+                // There are some exceptions: 
+                //   InvalidOperationException, ObjectDisposedException, SecurityException, ...
+                // Don't know how to deal with them: just throw
+                SocketOperation.DisposeSocketAsyncEventArgs(saea);
+                throw;
+            }
         }
 
 
@@ -342,7 +353,14 @@ namespace OpenGW.Networking
                 Debug.Assert(ex.SocketErrorCode != SocketError.Success);
                 error = ex.SocketErrorCode;
             }
-
+            catch
+            {
+                // There are other exceptions: 
+                //   InvalidOperationException, ObjectDisposedException, SecurityException, ...
+                // Don't know how to deal with them: just throw
+                SocketOperation.DisposeSocketAsyncEventArgs(saea);
+                throw;
+            }
 
             if (error == SocketError.Success && !isAsync)
             {
