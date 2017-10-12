@@ -240,13 +240,15 @@ namespace OpenGW.Proxy
 
                 case SocksConst.SOCKS5_BYTE_CMD_BIND:
                     return ProxyCheckerResult.Failed;  // TODO
+                    throw new NotImplementedException();
                 
                 case SocksConst.SOCKS5_BYTE_CMD_UDP_ASSOCIATE:
                     return ProxyCheckerResult.Failed;  // TODO
+                    throw new NotImplementedException();
                 
                 default:
                     // cmd is checked before to garantee valid.
-                    throw new NotImplementedException("Should not reach here");
+                    throw new ShouldNotReachHereException();
             }
         }
         

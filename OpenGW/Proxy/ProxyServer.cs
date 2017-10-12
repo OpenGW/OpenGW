@@ -85,12 +85,12 @@ namespace OpenGW.Proxy
 
         void ISocketEvent.OnConnect(GWSocket connectedSocket)
         {
-            throw new NotImplementedException("Should not reach here");
+            throw new ShouldNotReachHereException();
         }
 
         void ISocketEvent.OnConnectError(GWSocket socket, SocketError error)
         {
-            throw new NotImplementedException("Should not reach here");
+            throw new ShouldNotReachHereException();
         }
 
         void ISocketEvent.OnReceive(GWSocket gwSocket, byte[] buffer, int offset, int count)
