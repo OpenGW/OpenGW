@@ -13,6 +13,7 @@ namespace OpenGW.Proxy
         private class ProxyListenerInformation
         {
             public readonly List<byte> ReceiveBuffer = new List<byte>();
+            public AbstractProxyChecker ProxyChecker = null;
             public AbstractProxyListener ProxyListener = null;
         }
         
@@ -94,46 +95,66 @@ namespace OpenGW.Proxy
             {
                 Debug.Assert(info.ProxyListener.Server == this);
                 Debug.Assert(info.ProxyListener.ConnectedSocket == socket);
+
                 info.ProxyListener.OnReceiveData(buffer, offset, count);
                 return;
             }
-            
+
             // Now there is no proxy listener
             // Try to distinguish one from the received bytes
             info.ReceiveBuffer.AddRange(new ArraySegment<byte>(buffer, offset, count));
 
-            bool atLeastOneUncertainProxyType = false;
-            do
+            // If there is no even the proxy checker, try to get a (general) checker
+            if (info.ProxyChecker == null)
             {
-                // TODO: Configure: whether this listener supports HTTP proxy
-                bool? result = HttpProxyListener.TryProxyHeader(info.ReceiveBuffer);
-                atLeastOneUncertainProxyType = atLeastOneUncertainProxyType || !result.HasValue;
-                if (result.HasValue && result.Value)
+                // AbstractProxyChecker.TryCheck might return null.
+                switch (AbstractProxyChecker.TryCheck(this, socket, info.ReceiveBuffer, out info.ProxyChecker))
                 {
-                    info.ProxyListener = new HttpProxyListener(this, socket);
-                    break;
+                    case ProxyCheckerResult.Success:
+                        Debug.Assert(info.ProxyChecker != null);
+                        break;
+                    case ProxyCheckerResult.Failed:
+                        Debug.Assert(info.ProxyChecker == null);
+                        socket.Shutdown(SocketShutdown.Both);
+                        socket.Dispose();
+                        return;
+                    case ProxyCheckerResult.Uncertain:
+                        Debug.Assert(info.ProxyChecker == null);
+                        return;
+                    default:
+                        throw new ArgumentOutOfRangeException();
                 }
-                
-                // TODO: Configure: whether this listener supports SOCKS proxy
-                result = SocksProxyListener.TryProxyHeader(info.ReceiveBuffer);
-                atLeastOneUncertainProxyType = atLeastOneUncertainProxyType || !result.HasValue;
-                if (result.HasValue && result.Value)
-                {
-                    info.ProxyListener = new SocksProxyListener(this, socket);
-                    break;
-                }
-            } while (false);
+            }
 
-            if (info.ProxyListener != null)
+            Debug.Assert(info.ProxyChecker != null);
+            Debug.Assert(info.ProxyListener == null);
+
+            // info.ProxyChecker.Initialize may return null
+            switch (info.ProxyChecker.Initialize(info.ReceiveBuffer, out info.ProxyListener, out int unusedBytes))
             {
-                byte[] receivedBytes = info.ReceiveBuffer.ToArray();
-                info.ProxyListener.OnReceiveData(receivedBytes, 0, receivedBytes.Length);
+                case ProxyCheckerResult.Success:
+                    Debug.Assert(info.ProxyListener != null);
+                    if (unusedBytes > 0)
+                    {
+                        byte[] receivedBytes = info.ReceiveBuffer.ToArray();
+                        info.ProxyListener.OnReceiveData(
+                            receivedBytes,
+                            receivedBytes.Length - unusedBytes,
+                            unusedBytes);
+                    }
+                    break;
+                case ProxyCheckerResult.Failed:
+                    Debug.Assert(info.ProxyListener == null);
+                    socket.Shutdown(SocketShutdown.Both);
+                    socket.Dispose();
+                    break;
+                case ProxyCheckerResult.Uncertain:
+                    Debug.Assert(info.ProxyListener == null);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
-            else if (!atLeastOneUncertainProxyType)
-            {
-                socket.Shutdown(SocketShutdown.Both);
-                socket.Dispose();
-            }
+
         }
 
         void ISocketEvent.OnReceiveError(Socket socket, SocketError error)

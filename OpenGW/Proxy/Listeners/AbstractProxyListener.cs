@@ -1,4 +1,5 @@
-﻿using System.Net.Sockets;
+﻿using System.Collections.Generic;
+using System.Net.Sockets;
 using OpenGW.Networking;
 
 namespace OpenGW.Proxy
@@ -18,7 +19,7 @@ namespace OpenGW.Proxy
         {
             SocketOperation.StartSend(this.Server, this.ConnectedSocket, buffer, offset, count);
         }
-
+        
         public abstract void OnReceiveData(byte[] buffer, int offset, int count);
 
         public abstract void OnCloseConnection(SocketError status);
