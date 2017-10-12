@@ -391,6 +391,10 @@ namespace OpenGW.Networking
                 Debug.Assert(ex.SocketErrorCode != SocketError.Success);
                 error = ex.SocketErrorCode;
             }
+            catch (ObjectDisposedException)
+            {
+                error = SocketError.SocketError;
+            }
 
             
             if (error == SocketError.Success && !isAsync)
