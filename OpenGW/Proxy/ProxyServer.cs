@@ -61,7 +61,7 @@ namespace OpenGW.Proxy
         void ISocketEvent.OnAccept(Socket listener, Socket acceptSocket)
         {
             // TODO: Log
-            Console.WriteLine($"[Accept]");
+            // Console.WriteLine($"[Accept]");
 
             bool success = this.m_ActiveProxyListeners.TryAdd(acceptSocket, new ProxyListenerInformation());
             Debug.Assert(success);
@@ -166,7 +166,7 @@ namespace OpenGW.Proxy
         void ISocketEvent.OnSend(Socket socket, byte[] buffer, int offset, int count)
         {
             // TODO: Log
-            Console.WriteLine($"[Send]");
+            //Console.WriteLine($"[Send]");
         }
 
         void ISocketEvent.OnSendError(Socket socket, SocketError error)
@@ -180,10 +180,10 @@ namespace OpenGW.Proxy
             // TODO: Log
             Console.WriteLine($"[CloseConnection] {error}");
             
-            bool success = this.m_ActiveProxyListeners.TryRemove(socket, out ProxyListenerInformation dummy);
+            bool success = this.m_ActiveProxyListeners.TryRemove(socket, out ProxyListenerInformation info);
             Debug.Assert(success);
             
-            dummy.ProxyListener?.OnCloseConnection(error);
+            info.ProxyListener?.OnCloseConnection(error);
         }
 
         void ISocketEvent.OnCloseListener(Socket listener, SocketError error)

@@ -22,13 +22,13 @@ namespace OpenGW.Proxy
             )
             : base(server, connectedSocket)
         {
-            Console.WriteLine($"Happily accept a proxy connection: HTTP");
-            Console.WriteLine($"Http    - {httpVersion}");
-            Console.WriteLine($"Domain  - {endpoint}");
+            //Console.WriteLine($"Happily accept a proxy connection: HTTP");
+            //Console.WriteLine($"Http    - {httpVersion}");
+            //Console.WriteLine($"Domain  - {endpoint}");
 
             foreach (KeyValuePair<string,string> pair in headers)
             {
-                Console.WriteLine($"Header  - {pair.Key} = {pair.Value}");
+                //Console.WriteLine($"Header  - {pair.Key} = {pair.Value}");
             }
 
             if (!NetUtility.TrySplitHostAndPort(endpoint, out string hostOrIp, out int? optPort))
@@ -57,6 +57,8 @@ namespace OpenGW.Proxy
                         this.StartSend(buffer, 0, cnt);
                     }
                 });
+
+                Console.WriteLine($"[HttpProxy] Proxy: {hostOrIp}:{port} (HTTP/{httpVersion})");
                 
                 byte[] response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\n\r\n");
                 this.StartSend(response, 0, response.Length);
@@ -71,7 +73,7 @@ namespace OpenGW.Proxy
 
         public override void OnReceiveData(byte[] buffer, int offset, int count)
         {
-            Console.WriteLine($"[Receive] Offset = {offset}, Count = {count}");
+            //Console.WriteLine($"[Receive] Offset = {offset}, Count = {count}");
             int sent = this.m_Socket.Send(buffer, offset, count, SocketFlags.None);
             Debug.Assert(sent == count);
         }

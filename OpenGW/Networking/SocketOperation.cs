@@ -381,6 +381,7 @@ namespace OpenGW.Networking
 
             SocketError error;
             bool isAsync = false;
+            bool disposed = false;
             try
             {
                 isAsync = token.Socket.ReceiveAsync(saea);
@@ -394,8 +395,8 @@ namespace OpenGW.Networking
             catch (ObjectDisposedException)
             {
                 error = SocketError.SocketError;
+                disposed = true;
             }
-
             
             if (error == SocketError.Success && !isAsync)
             {
@@ -403,7 +404,10 @@ namespace OpenGW.Networking
             }
             else if (error != SocketError.Success)
             {
-                token.ClientOrServer.OnReceiveError(token.Socket, error);
+                if (!disposed)  // not due to ObjectDisposedException
+                {
+                    token.ClientOrServer.OnReceiveError(token.Socket, error);
+                }
 
                 SocketOperation.CloseSocketConnection(token, error);
             }
