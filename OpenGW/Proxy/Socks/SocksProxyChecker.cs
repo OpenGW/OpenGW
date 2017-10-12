@@ -209,11 +209,11 @@ namespace OpenGW.Proxy
             switch (aType)
             {
                 case SocksConst.SOCKS5_BYTE_ATYPE_IPV4:
-                    dstAddrLength = 4;
+                case SocksConst.SOCKS5_BYTE_ATYPE_IPV6:
+                    dstAddrLength = (aType == SocksConst.SOCKS5_BYTE_ATYPE_IPV4) ? 4 : 16;
                     if (firstBytes.Count < ptrOffset + 4 + dstAddrLength + 2) return ProxyCheckerResult.Uncertain;
-                    IList<byte> ipv4 = new ArraySegment<byte>(firstBytesArray, ptrOffset + 4, dstAddrLength);
-                    string strIPv4 = $"{ipv4[0]}.{ipv4[1]}.{ipv4[2]}.{ipv4[3]}";
-                    dstAddrs.Add(IPAddress.Parse(strIPv4));
+                    byte[] ip = new ArraySegment<byte>(firstBytesArray, ptrOffset + 4, dstAddrLength).ToArray();
+                    dstAddrs.Add(new IPAddress(ip));
                     break;
                 case SocksConst.SOCKS5_BYTE_ATYPE_DOMAINNAME:
                     dstAddrLength = 1 + (int)firstBytes[ptrOffset + 4];
@@ -221,20 +221,6 @@ namespace OpenGW.Proxy
                     string hostname = Encoding.ASCII.GetString(
                         new ArraySegment<byte>(firstBytesArray, ptrOffset + 4 + 1, dstAddrLength - 1).ToArray());
                     dstAddrs.AddRange(this.ProxyServer.DnsQuery(hostname));
-                    break;
-                case SocksConst.SOCKS5_BYTE_ATYPE_IPV6:
-                    dstAddrLength = 16;
-                    if (firstBytes.Count < ptrOffset + 4 + dstAddrLength + 2) return ProxyCheckerResult.Uncertain;
-                    byte[] ipv6 = new ArraySegment<byte>(firstBytesArray, ptrOffset + 4, dstAddrLength).ToArray();
-                    string strIPv6 = $"{ipv6[0]:X2}{ipv6[1]:X2}:" +
-                                     $"{ipv6[2]:X2}{ipv6[3]:X2}:" +
-                                     $"{ipv6[4]:X2}{ipv6[5]:X2}:" +
-                                     $"{ipv6[6]:X2}{ipv6[7]:X2}:" +
-                                     $"{ipv6[8]:X2}{ipv6[9]:X2}:" +
-                                     $"{ipv6[10]:X2}{ipv6[11]:X2}:" +
-                                     $"{ipv6[12]:X2}{ipv6[13]:X2}:" +
-                                     $"{ipv6[14]:X2}{ipv6[15]:X2}";
-                    dstAddrs.Add(IPAddress.Parse(strIPv6));
                     break;
                 default:
                     return ProxyCheckerResult.Failed;
