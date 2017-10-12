@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 
 namespace OpenGW.Networking
@@ -44,6 +45,43 @@ namespace OpenGW.Networking
                     this.Socket.Shutdown(SocketShutdown.Both);
                     this.Socket.Dispose();
                     break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
+        public void UpdateEndPointCache()
+        {
+            if (this.m_Closed) return;  // TODO: Log an error
+
+            switch (this.Type)
+            {
+                case GWSocketType.TcpServerListener:
+                    this.LocalEndPointCache = (IPEndPoint)this.Socket.LocalEndPoint;
+                    break;
+                case GWSocketType.TcpServerConnection:
+                case GWSocketType.TcpClientConnection:
+                    this.LocalEndPointCache = (IPEndPoint)this.Socket.LocalEndPoint;
+                    this.RemoteEndPointCache = (IPEndPoint)this.Socket.RemoteEndPoint;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
+        public override string ToString()
+        {
+            string localEp = this.LocalEndPointCache?.ToString() ?? "<null>";
+            string remoteEp = this.RemoteEndPointCache?.ToString() ?? "<null>";
+
+            switch (this.Type)
+            {
+                case GWSocketType.TcpServerListener:
+                    return $"@{localEp}";
+                case GWSocketType.TcpServerConnection:
+                    return $"[S<] {localEp} -> {remoteEp}";
+                case GWSocketType.TcpClientConnection:
+                    return $"[C>] {localEp} -> {remoteEp}";
                 default:
                     throw new ArgumentOutOfRangeException();
             }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -11,7 +12,7 @@ namespace OpenGW.Proxy
 {
     public class HttpProxyListener : AbstractProxyListener
     {
-        private Socket m_Socket;
+        private readonly Socket m_Socket;
     
         public HttpProxyListener(
             ProxyServer server, 
@@ -40,9 +41,12 @@ namespace OpenGW.Proxy
             int port = optPort ?? 80;
             try
             {
-                IPAddress ip = Dns.GetHostAddressesAsync(hostOrIp).Result[0];
-                this.m_Socket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                this.m_Socket.Connect(ip, port);
+                IPAddress[] ips = Dns.GetHostAddressesAsync(hostOrIp).Result;
+                string strIPs = string.Join(", ", ips.Select(ip => ip.ToString()));
+                Console.WriteLine($"[DNS] {hostOrIp} -> {strIPs}");
+                
+                this.m_Socket = new Socket(ips[0].AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                this.m_Socket.Connect(ips[0], port);
                 Task.Run(() =>
                 {
                     while (true)

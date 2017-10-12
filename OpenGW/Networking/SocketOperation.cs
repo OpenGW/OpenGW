@@ -115,6 +115,7 @@ namespace OpenGW.Networking
             {
                 // Callback: OnAccept()
                 GWSocket gwAcceptedSocket = new GWSocket(saea.AcceptSocket, GWSocketType.TcpServerConnection);
+                gwAcceptedSocket.UpdateEndPointCache();
                 token.ClientOrServer.OnAccept(token.GwSocket, gwAcceptedSocket);
                 
                 // Add accepted socket to active sockets
@@ -162,6 +163,10 @@ namespace OpenGW.Networking
             if (saea.SocketError == SocketError.Success)
             {
                 Debug.Assert(object.ReferenceEquals(saea.ConnectSocket, token.GwSocket.Socket));
+                
+                Debug.Assert(token.GwSocket.Type == GWSocketType.TcpClientConnection);
+                token.GwSocket.UpdateEndPointCache();
+                
                 token.ClientOrServer.OnConnect(token.GwSocket);
                 
                 // Add connected socket to active sockets
@@ -303,7 +308,8 @@ namespace OpenGW.Networking
         public static void StartAccept(ISocketEvent server, GWSocket listenerGwSocket)
         {
             Debug.Assert(listenerGwSocket.Type == GWSocketType.TcpServerListener);
-            
+            listenerGwSocket.UpdateEndPointCache();  // store LocalEndPoint
+
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
             saea.Completed += SocketOperation.SocketAsyncEventArgs_OnCompleted;
 

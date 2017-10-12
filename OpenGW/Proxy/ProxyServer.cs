@@ -70,12 +70,12 @@ namespace OpenGW.Proxy
             Debug.Assert(success);
         }
 
-        void ISocketEvent.OnAcceptError(GWSocket listener, SocketError error)
+        void ISocketEvent.OnAcceptError(GWSocket gwListener, SocketError error)
         {
-            Debug.Assert(listener.Type == GWSocketType.TcpServerListener);
+            Debug.Assert(gwListener.Type == GWSocketType.TcpServerListener);
             
             // TODO: Log
-            Console.WriteLine($"[AcceptError] {error}");
+            Console.WriteLine($"[AcceptError] ({gwListener}) {error}");
         }
 
         void ISocketEvent.OnConnect(GWSocket connectedSocket)
@@ -173,7 +173,7 @@ namespace OpenGW.Proxy
             Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnection);
             
             // TODO: Log
-            Console.WriteLine($"[CloseConnection] {error}");
+            Console.WriteLine($"[CloseConnection] ({gwSocket}) {error}");
             
             bool success = this.m_ActiveProxyListeners.TryRemove(gwSocket, out ProxyListenerInformation info);
             Debug.Assert(success);
@@ -186,7 +186,7 @@ namespace OpenGW.Proxy
             Debug.Assert(listener.Type == GWSocketType.TcpServerListener);
             
             // TODO: Log
-            Console.WriteLine($"[CloseListener] {error}");
+            Console.WriteLine($"[CloseListener] ({listener}) {error}");
         }
     }
 }

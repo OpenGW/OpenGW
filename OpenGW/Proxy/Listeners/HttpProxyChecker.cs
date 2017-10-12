@@ -10,15 +10,15 @@ namespace OpenGW.Proxy
 {
     public class HttpProxyChecker : AbstractProxyChecker
     {
+        private const string CONNECT_UPPER = "CONNECT";
+        private const string CONNECT_LOWER = "connect";
         
         private static readonly Regex s_RegexHttpHeaders 
             = new Regex(@"^CONNECT(\s+)(?<HOSTNAME>\S+)(\s+)HTTP/(?<HTTP_VERSION>[0-9\.]+)(\s*\r?\n)((?<HEADERS>[^\n]+?)\r?\n)*(\r?\n)$",
                 RegexOptions.Compiled | RegexOptions.ExplicitCapture | RegexOptions.IgnoreCase);
         
         public static ProxyCheckerResult TryThisProxy(List<byte> firstBytes)
-        {
-            const string CONNECT_UPPER = "CONNECT";
-            const string CONNECT_LOWER = "connect";
+        {            
 
             for (int i = Math.Min(CONNECT_UPPER.Length, firstBytes.Count) - 1; i >= 0; --i)
             {
@@ -39,7 +39,7 @@ namespace OpenGW.Proxy
         
         public override ProxyCheckerResult Initialize(List<byte> firstBytes, out AbstractProxyListener proxyListener, out int unusedBytes)
         {
-            Debug.Assert(firstBytes.Count >= "CONNECT".Length);
+            Debug.Assert(firstBytes.Count >= CONNECT_UPPER.Length);
             
             // Default values (failed or uncertain)
             proxyListener = null;
@@ -49,7 +49,7 @@ namespace OpenGW.Proxy
             // Find pattern: (\r?\n){2}
             if (this.m_LastScanPosition == 0)
             {
-                this.m_LastScanPosition = "CONNECT".Length;
+                this.m_LastScanPosition = CONNECT_UPPER.Length;
             }
             for (; this.m_LastScanPosition < firstBytes.Count; ++this.m_LastScanPosition)
             {
@@ -73,6 +73,7 @@ namespace OpenGW.Proxy
             }
 
             string request = Encoding.ASCII.GetString(firstBytes.ToArray(), 0, this.m_LastScanPosition + 1);
+            Console.WriteLine(request);
             Match match = s_RegexHttpHeaders.Match(request);
             if (!match.Success)
             {
