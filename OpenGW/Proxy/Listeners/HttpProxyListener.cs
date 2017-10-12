@@ -15,12 +15,12 @@ namespace OpenGW.Proxy
     
         public HttpProxyListener(
             ProxyServer server, 
-            Socket connectedSocket,
+            GWSocket connectedGwSocket,
             string httpVersion,
             string endpoint,
             Dictionary<string, string> headers
             )
-            : base(server, connectedSocket)
+            : base(server, connectedGwSocket)
         {
             //Console.WriteLine($"Happily accept a proxy connection: HTTP");
             //Console.WriteLine($"Http    - {httpVersion}");

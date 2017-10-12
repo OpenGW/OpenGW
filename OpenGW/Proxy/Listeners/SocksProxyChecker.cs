@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Net.Sockets;
+using OpenGW.Networking;
 
 namespace OpenGW.Proxy
 {
@@ -16,8 +17,8 @@ namespace OpenGW.Proxy
             throw new System.NotImplementedException();
         }
 
-        public SocksProxyChecker(ProxyServer proxyServer, Socket connectedSocket) 
-            : base(proxyServer, connectedSocket)
+        public SocksProxyChecker(ProxyServer proxyServer, GWSocket connectedGwSocket) 
+            : base(proxyServer, connectedGwSocket)
         {
         }
     }

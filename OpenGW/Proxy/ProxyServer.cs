@@ -20,10 +20,10 @@ namespace OpenGW.Proxy
         public ProxyConfiguration Configuration { get; }
 
         
-        private readonly ConcurrentDictionary<Socket, ProxyListenerInformation> m_ActiveProxyListeners
-            = new ConcurrentDictionary<Socket, ProxyListenerInformation>();
+        private readonly ConcurrentDictionary<GWSocket, ProxyListenerInformation> m_ActiveProxyListeners
+            = new ConcurrentDictionary<GWSocket, ProxyListenerInformation>();
         
-        private Socket m_ServerSocket;
+        private GWSocket m_ServerGwSocket;
         
         
         public ProxyServer(ProxyConfiguration configuration)
@@ -33,59 +33,66 @@ namespace OpenGW.Proxy
 
         public void Start()
         {
-            this.m_ServerSocket = new Socket(
+            Socket serverSocket = new Socket(
                 this.Configuration.ListenEndpoint.AddressFamily,
                 SocketType.Stream, 
                 ProtocolType.Tcp);
-            
+                
             if (Socket.OSSupportsIPv6 && 
                 this.Configuration.ListenEndpoint.AddressFamily == AddressFamily.InterNetworkV6)
             {
-                this.m_ServerSocket.DualMode = this.Configuration.DualModeIfPossible;
+                serverSocket.DualMode = this.Configuration.DualModeIfPossible;
             }
-            this.m_ServerSocket.LingerState = new LingerOption(true, 0);  // don't linger
+            serverSocket.LingerState = new LingerOption(true, 0);  // don't linger
             
-            this.m_ServerSocket.Bind(this.Configuration.ListenEndpoint);
+            serverSocket.Bind(this.Configuration.ListenEndpoint);
             
-            this.m_ServerSocket.Listen(0);
+            serverSocket.Listen(0);
             
-            SocketOperation.StartAccept(this, this.m_ServerSocket);
+            this.m_ServerGwSocket = new GWSocket(serverSocket, GWSocketType.TcpServerListener);
+            SocketOperation.StartAccept(this, this.m_ServerGwSocket);
         }
 
         public void Stop()
         {
-            this.m_ServerSocket?.Dispose();
+            this.m_ServerGwSocket.Close();
         }
         
         
-        void ISocketEvent.OnAccept(Socket listener, Socket acceptSocket)
+        void ISocketEvent.OnAccept(GWSocket listener, GWSocket acceptGwSocket)
         {
+            Debug.Assert(listener.Type == GWSocketType.TcpServerListener);
+
             // TODO: Log
             // Console.WriteLine($"[Accept]");
 
-            bool success = this.m_ActiveProxyListeners.TryAdd(acceptSocket, new ProxyListenerInformation());
+            bool success = this.m_ActiveProxyListeners.TryAdd(acceptGwSocket, new ProxyListenerInformation());
             Debug.Assert(success);
         }
 
-        void ISocketEvent.OnAcceptError(Socket listener, SocketError error)
+        void ISocketEvent.OnAcceptError(GWSocket listener, SocketError error)
         {
+            Debug.Assert(listener.Type == GWSocketType.TcpServerListener);
+            
             // TODO: Log
             Console.WriteLine($"[AcceptError] {error}");
         }
 
-        void ISocketEvent.OnConnect(Socket connectedSocket)
+        void ISocketEvent.OnConnect(GWSocket connectedSocket)
         {
             throw new NotImplementedException("Should not reach here");
         }
 
-        void ISocketEvent.OnConnectError(Socket socket, SocketError error)
+        void ISocketEvent.OnConnectError(GWSocket socket, SocketError error)
         {
             throw new NotImplementedException("Should not reach here");
         }
 
-        void ISocketEvent.OnReceive(Socket socket, byte[] buffer, int offset, int count)
+        void ISocketEvent.OnReceive(GWSocket gwSocket, byte[] buffer, int offset, int count)
         {
-            if (!this.m_ActiveProxyListeners.TryGetValue(socket, out ProxyListenerInformation info))
+            Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnection);
+            
+            if (!this.m_ActiveProxyListeners.TryGetValue(gwSocket, out ProxyListenerInformation info))
             {
                 // This socket has been closed
                 return;
@@ -94,7 +101,7 @@ namespace OpenGW.Proxy
             if (info.ProxyListener != null)
             {
                 Debug.Assert(info.ProxyListener.Server == this);
-                Debug.Assert(info.ProxyListener.ConnectedSocket == socket);
+                Debug.Assert(info.ProxyListener.ConnectedGwSocket == gwSocket);
 
                 info.ProxyListener.OnReceiveData(buffer, offset, count);
                 return;
@@ -108,15 +115,14 @@ namespace OpenGW.Proxy
             if (info.ProxyChecker == null)
             {
                 // AbstractProxyChecker.TryCheck might return null.
-                switch (AbstractProxyChecker.TryCheck(this, socket, info.ReceiveBuffer, out info.ProxyChecker))
+                switch (AbstractProxyChecker.TryCheck(this, gwSocket, info.ReceiveBuffer, out info.ProxyChecker))
                 {
                     case ProxyCheckerResult.Success:
                         Debug.Assert(info.ProxyChecker != null);
                         break;
                     case ProxyCheckerResult.Failed:
                         Debug.Assert(info.ProxyChecker == null);
-                        socket.Shutdown(SocketShutdown.Both);
-                        socket.Dispose();
+                        gwSocket.Close();
                         return;
                     case ProxyCheckerResult.Uncertain:
                         Debug.Assert(info.ProxyChecker == null);
@@ -145,8 +151,7 @@ namespace OpenGW.Proxy
                     break;
                 case ProxyCheckerResult.Failed:
                     Debug.Assert(info.ProxyListener == null);
-                    socket.Shutdown(SocketShutdown.Both);
-                    socket.Dispose();
+                    gwSocket.Close();
                     break;
                 case ProxyCheckerResult.Uncertain:
                     Debug.Assert(info.ProxyListener == null);
@@ -157,37 +162,29 @@ namespace OpenGW.Proxy
 
         }
 
-        void ISocketEvent.OnReceiveError(Socket socket, SocketError error)
-        {
-            // TODO: Log
-            Console.WriteLine($"[ReceiveError] {error}");
-        }
-
-        void ISocketEvent.OnSend(Socket socket, byte[] buffer, int offset, int count)
+        void ISocketEvent.OnSend(GWSocket gwSocket, byte[] buffer, int offset, int count)
         {
             // TODO: Log
             //Console.WriteLine($"[Send]");
         }
 
-        void ISocketEvent.OnSendError(Socket socket, SocketError error)
+        void ISocketEvent.OnCloseConnection(GWSocket gwSocket, SocketError error)
         {
-            // TODO: Log
-            Console.WriteLine($"[SendError] {error}");
-        }
-
-        void ISocketEvent.OnCloseConnection(Socket socket, SocketError error)
-        {
+            Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnection);
+            
             // TODO: Log
             Console.WriteLine($"[CloseConnection] {error}");
             
-            bool success = this.m_ActiveProxyListeners.TryRemove(socket, out ProxyListenerInformation info);
+            bool success = this.m_ActiveProxyListeners.TryRemove(gwSocket, out ProxyListenerInformation info);
             Debug.Assert(success);
             
             info.ProxyListener?.OnCloseConnection(error);
         }
 
-        void ISocketEvent.OnCloseListener(Socket listener, SocketError error)
+        void ISocketEvent.OnCloseListener(GWSocket listener, SocketError error)
         {
+            Debug.Assert(listener.Type == GWSocketType.TcpServerListener);
+            
             // TODO: Log
             Console.WriteLine($"[CloseListener] {error}");
         }

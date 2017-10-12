@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Sockets;
+using OpenGW.Networking;
 
 namespace OpenGW.Proxy
 {
@@ -15,7 +17,7 @@ namespace OpenGW.Proxy
     {
         [ThreadStatic] private static bool[] s_AtLeastOneUncertain;
                 
-        public static ProxyCheckerResult TryCheck(ProxyServer proxyServer, Socket connectedSocket, List<byte> firstBytes, out AbstractProxyChecker checker)
+        public static ProxyCheckerResult TryCheck(ProxyServer proxyServer, GWSocket connectedSocket, List<byte> firstBytes, out AbstractProxyChecker checker)
         {
             if (s_AtLeastOneUncertain == null)
             {
@@ -57,14 +59,16 @@ namespace OpenGW.Proxy
 
         
         protected readonly ProxyServer ProxyServer;
-        protected readonly Socket ConnectedSocket;
+        protected readonly GWSocket ConnectedGwSocket;
 
         public abstract ProxyCheckerResult Initialize(List<byte> firstBytes, out AbstractProxyListener proxyListener, out int unusedBytes);
-                
-        protected AbstractProxyChecker(ProxyServer proxyServer, Socket connectedSocket)
+        
+        protected AbstractProxyChecker(ProxyServer proxyServer, GWSocket connectedGwSocket)
         {
+            Debug.Assert(connectedGwSocket.Type == GWSocketType.TcpServerConnection);
+            
             this.ProxyServer = proxyServer;
-            this.ConnectedSocket = connectedSocket;
+            this.ConnectedGwSocket = connectedGwSocket;
         }
     }
 }

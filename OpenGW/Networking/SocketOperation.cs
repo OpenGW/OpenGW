@@ -20,20 +20,20 @@ namespace OpenGW.Networking
             ///  - Send:    The server/client connected socket
             ///  - Receive: The server/client connected socket
             /// </summary>
-            public Socket Socket;
+            public GWSocket GwSocket;
 
             public void Cleanup()
             {
                 this.ClientOrServer = null;
-                this.Socket = null;
+                this.GwSocket = null;
             }
         }
         
         
         private const int RECEIVE_BUFFER_LENGTH = 4096;
         
-        private static readonly ConcurrentDictionary<Socket, bool> s_ActiveConnectedSockets 
-            = new ConcurrentDictionary<Socket, bool>();
+        private static readonly ConcurrentDictionary<GWSocket, bool> s_ActiveConnectedSockets 
+            = new ConcurrentDictionary<GWSocket, bool>();
         
         private static readonly Pool<SocketAsyncEventArgs> s_ReceivePool;
         private static readonly Pool<SocketAsyncEventArgs> s_SendPool;
@@ -114,13 +114,14 @@ namespace OpenGW.Networking
             if (saea.SocketError == SocketError.Success)
             {
                 // Callback: OnAccept()
-                token.ClientOrServer.OnAccept(token.Socket, saea.AcceptSocket);
+                GWSocket gwAcceptedSocket = new GWSocket(saea.AcceptSocket, GWSocketType.TcpServerConnection);
+                token.ClientOrServer.OnAccept(token.GwSocket, gwAcceptedSocket);
                 
                 // Add accepted socket to active sockets
-                s_ActiveConnectedSockets.TryAdd(saea.AcceptSocket, true);  // true is dummy
+                s_ActiveConnectedSockets.TryAdd(gwAcceptedSocket, true);  // true is dummy
 
                 // Start receving on the accepted socket
-                SocketOperation.StartReceive(token.ClientOrServer, saea.AcceptSocket);
+                SocketOperation.StartReceive(token.ClientOrServer, gwAcceptedSocket);
                 
                 // Continue to accept new sockets
                 SocketOperation.StartAcceptInternal(saea);
@@ -128,7 +129,7 @@ namespace OpenGW.Networking
             else if (saea.SocketError == SocketError.OperationAborted)
             {
                 // Callback: OnCloseListener()
-                token.ClientOrServer.OnCloseListener(token.Socket, saea.SocketError);
+                token.ClientOrServer.OnCloseListener(token.GwSocket, saea.SocketError);
                 
                 // Now the listener socket is closed. Stop accepting.
                 SocketOperation.DisposeSocketAsyncEventArgs(saea);
@@ -145,7 +146,7 @@ namespace OpenGW.Networking
                 // Applications using the AcceptAsync method should be prepared to handle this condition.
                 
                 // Now an error happened during accepting
-                token.ClientOrServer.OnAcceptError(token.Socket, saea.SocketError);
+                token.ClientOrServer.OnAcceptError(token.GwSocket, saea.SocketError);
                 
                 // Continue to accept new sockets
                 SocketOperation.StartAcceptInternal(saea);
@@ -160,18 +161,18 @@ namespace OpenGW.Networking
 
             if (saea.SocketError == SocketError.Success)
             {
-                Debug.Assert(object.ReferenceEquals(saea.ConnectSocket, token.Socket));
-                token.ClientOrServer.OnConnect(token.Socket);
+                Debug.Assert(object.ReferenceEquals(saea.ConnectSocket, token.GwSocket.Socket));
+                token.ClientOrServer.OnConnect(token.GwSocket);
                 
                 // Add connected socket to active sockets
-                s_ActiveConnectedSockets.TryAdd(token.Socket, true);  // true is dummy
+                s_ActiveConnectedSockets.TryAdd(token.GwSocket, true);  // true is dummy
                 
                 // Start receving on the accepted socket
-                SocketOperation.StartReceive(token.ClientOrServer, token.Socket);
+                SocketOperation.StartReceive(token.ClientOrServer, token.GwSocket);
             }
             else
             {
-                token.ClientOrServer.OnConnectError(token.Socket, saea.SocketError);
+                token.ClientOrServer.OnConnectError(token.GwSocket, saea.SocketError);
                                 
                 // TODO: Should I dispose token.Socket here?
             }
@@ -190,7 +191,7 @@ namespace OpenGW.Networking
             {
                 if (saea.BytesTransferred > 0)
                 {
-                    token.ClientOrServer.OnReceive(token.Socket, saea.Buffer, saea.Offset, saea.BytesTransferred);
+                    token.ClientOrServer.OnReceive(token.GwSocket, saea.Buffer, saea.Offset, saea.BytesTransferred);
                     
                     SocketOperation.StartReceiveInternal(saea);
                     return;
@@ -203,7 +204,8 @@ namespace OpenGW.Networking
             else
             {
                 // Now an error happened during receiving
-                token.ClientOrServer.OnReceiveError(token.Socket, saea.SocketError);
+                // OnReceiveError() is removed now
+                //token.ClientOrServer.OnReceiveError(token.GwSocket, saea.SocketError);
             }
             
             // Close the socket (OnCloseConnection() will be called)
@@ -226,12 +228,13 @@ namespace OpenGW.Networking
                 Debug.Assert(saea.BytesTransferred > 0 || saea.Count == 0);
                 
                 // Callback - OnSend event
-                token.ClientOrServer.OnSend(token.Socket, saea.Buffer, saea.Offset, saea.BytesTransferred);
+                token.ClientOrServer.OnSend(token.GwSocket, saea.Buffer, saea.Offset, saea.BytesTransferred);
             }
             else
             {
                 // Now an error happened during sending
-                token.ClientOrServer.OnSendError(token.Socket, saea.SocketError);
+                // OnSendError() is removed now
+                //token.ClientOrServer.OnSendError(token.GwSocket, saea.SocketError);
             
                 // Close the socket (OnCloseConnection() will be called)
                 SocketOperation.CloseSocketConnection(token, saea.SocketError);
@@ -245,6 +248,8 @@ namespace OpenGW.Networking
         private static void StartAcceptInternal(SocketAsyncEventArgs saea)
         {
             SocketUserToken token = (SocketUserToken)saea.UserToken;
+            
+            Debug.Assert(token.GwSocket.Type == GWSocketType.TcpServerListener);
 
             SocketError error;
             bool isAsync = false;
@@ -254,7 +259,7 @@ namespace OpenGW.Networking
 
                 // MSDN documentation:
                 // https://msdn.microsoft.com/en-us/library/system.net.sockets.socket.acceptasync(v=vs.110).aspx
-                isAsync = token.Socket.AcceptAsync(saea);
+                isAsync = token.GwSocket.Socket.AcceptAsync(saea);
                 error = SocketError.Success;
             }
             catch (SocketException ex)
@@ -266,7 +271,7 @@ namespace OpenGW.Networking
                 {
                     // SocketError.OperationAborted if listener is closed
                     // Callback: OnCloseListener()
-                    token.ClientOrServer.OnCloseListener(token.Socket, ex.SocketErrorCode);
+                    token.ClientOrServer.OnCloseListener(token.GwSocket, ex.SocketErrorCode);
 
                     // Dispose the SocketAsyncEventArgs
                     SocketOperation.DisposeSocketAsyncEventArgs(saea);
@@ -281,7 +286,7 @@ namespace OpenGW.Networking
                     // to ConnectionReset. This can occur as a result of port scanning using a half-open 
                     // SYN type scan (a SYN -> SYN-ACK -> RST sequence). 
                     // Applications using the AcceptAsync method should be prepared to handle this condition.
-                    token.ClientOrServer.OnAcceptError(token.Socket, ex.SocketErrorCode);
+                    token.ClientOrServer.OnAcceptError(token.GwSocket, ex.SocketErrorCode);
                 
                     // UNCERTAIN: try accept again, not just close the listener?
                     SocketOperation.StartAcceptInternal(saea);
@@ -295,15 +300,17 @@ namespace OpenGW.Networking
             }
         }
 
-        public static void StartAccept(ISocketEvent server, Socket listenerSocket)
+        public static void StartAccept(ISocketEvent server, GWSocket listenerGwSocket)
         {
+            Debug.Assert(listenerGwSocket.Type == GWSocketType.TcpServerListener);
+            
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
             saea.Completed += SocketOperation.SocketAsyncEventArgs_OnCompleted;
 
             saea.UserToken = new SocketUserToken
             {
                 ClientOrServer = server,
-                Socket = listenerSocket,
+                GwSocket = listenerGwSocket,
             };
 
             Debug.Assert(saea.AcceptSocket == null);
@@ -323,15 +330,17 @@ namespace OpenGW.Networking
         }
 
 
-        public static void StartConnect(ISocketEvent client, Socket clientSocket, IPEndPoint remoteEp)
+        public static void StartConnect(ISocketEvent client, GWSocket clientSocket, IPEndPoint remoteEp)
         {
+            Debug.Assert(clientSocket.Type == GWSocketType.TcpClientConnection);
+            
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
             saea.Completed += SocketOperation.SocketAsyncEventArgs_OnCompleted;
 
             saea.UserToken = new SocketUserToken
             {
                 ClientOrServer = client,
-                Socket = clientSocket,
+                GwSocket = clientSocket,
             };
             
             
@@ -343,7 +352,7 @@ namespace OpenGW.Networking
                 // https://msdn.microsoft.com/en-us/library/bb538102(v=vs.110).aspx
 
                 saea.RemoteEndPoint = remoteEp;
-                isAsync = clientSocket.ConnectAsync(saea);
+                isAsync = clientSocket.Socket.ConnectAsync(saea);
                 error = SocketError.Success;
             }
             catch (SocketException ex)
@@ -379,12 +388,15 @@ namespace OpenGW.Networking
         {
             SocketUserToken token = (SocketUserToken)saea.UserToken;
 
+            Debug.Assert(token.GwSocket.Type == GWSocketType.TcpServerConnection ||
+                         token.GwSocket.Type == GWSocketType.TcpClientConnection);
+
             SocketError error;
             bool isAsync = false;
             bool disposed = false;
             try
             {
-                isAsync = token.Socket.ReceiveAsync(saea);
+                isAsync = token.GwSocket.Socket.ReceiveAsync(saea);
                 error = SocketError.Success;
             }
             catch (SocketException ex)
@@ -406,31 +418,39 @@ namespace OpenGW.Networking
             {
                 if (!disposed)  // not due to ObjectDisposedException
                 {
-                    token.ClientOrServer.OnReceiveError(token.Socket, error);
+                    // OnReceiveError() is removed now
+                    //token.ClientOrServer.OnReceiveError(token.GwSocket, error);
                 }
 
                 SocketOperation.CloseSocketConnection(token, error);
             }
         }
 
-        private static void StartReceive(ISocketEvent clientOrServer, Socket socket)
+        private static void StartReceive(ISocketEvent clientOrServer, GWSocket gwSocket)
         {
+            Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnection ||
+                         gwSocket.Type == GWSocketType.TcpClientConnection);
+
             SocketAsyncEventArgs saea = s_ReceivePool.Pop();
             SocketUserToken token = (SocketUserToken)saea.UserToken;
             token.ClientOrServer = clientOrServer;
-            token.Socket = socket;
+            token.GwSocket = gwSocket;
             
             SocketOperation.StartReceiveInternal(saea);
         }
 
         
-        public static void StartSend(ISocketEvent clientOrServer, Socket socket, byte[] buffer, int offset, int count)
+        public static void StartSend(ISocketEvent clientOrServer, GWSocket gwSocket, byte[] buffer, int offset, int count)
         {
+            Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnection || 
+                         gwSocket.Type == GWSocketType.TcpClientConnection);
+            
+            
             SocketAsyncEventArgs saea = s_SendPool.Pop();
             
             SocketUserToken token = (SocketUserToken)saea.UserToken;
             token.ClientOrServer = clientOrServer;
-            token.Socket = socket;
+            token.GwSocket = gwSocket;
             
             SocketError error;
             bool isAsync = false;
@@ -438,7 +458,7 @@ namespace OpenGW.Networking
             {
                 saea.SetBuffer(buffer, offset, count);
                 
-                isAsync = token.Socket.SendAsync(saea);
+                isAsync = token.GwSocket.Socket.SendAsync(saea);
                 error = SocketError.Success;
             }
             catch (SocketException ex)
@@ -454,7 +474,8 @@ namespace OpenGW.Networking
             }
             else if (error != SocketError.Success)
             {
-                token.ClientOrServer.OnSendError(token.Socket, error);
+                // OnSendError() is removed now
+                //token.ClientOrServer.OnSendError(token.GwSocket, error);
                 
                 SocketOperation.CloseSocketConnection(token, error);
             }
@@ -464,7 +485,7 @@ namespace OpenGW.Networking
         
         private static void CloseSocketConnection(SocketUserToken token, SocketError error)
         {
-            if (!s_ActiveConnectedSockets.TryRemove(token.Socket, out bool dummy))
+            if (!s_ActiveConnectedSockets.TryRemove(token.GwSocket, out bool dummy))
             {
                 // This socket is not in the active sockets set.
                 // It must have been called CloseSocketConnection()
@@ -473,7 +494,7 @@ namespace OpenGW.Networking
             
             try
             {
-                token.Socket.Dispose();
+                token.GwSocket.Close();
             }
             catch (SocketException ex)
             {
@@ -486,7 +507,7 @@ namespace OpenGW.Networking
             }
             finally
             {
-                token.ClientOrServer.OnCloseConnection(token.Socket, error);
+                token.ClientOrServer.OnCloseConnection(token.GwSocket, error);
             }
         }
 

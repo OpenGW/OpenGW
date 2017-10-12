@@ -5,24 +5,20 @@ namespace OpenGW.Networking
 {
     public interface ISocketEvent
     {        
-        void OnAccept(Socket listener, Socket acceptSocket);
+        void OnAccept(GWSocket listener, GWSocket acceptSocket);
 
-        void OnAcceptError(Socket listener, SocketError error);
+        void OnAcceptError(GWSocket listener, SocketError error);
         
-        void OnConnect(Socket connectedSocket);
+        void OnConnect(GWSocket connectedSocket);
         
-        void OnConnectError(Socket socket, SocketError error);
+        void OnConnectError(GWSocket socket, SocketError error);
         
-        void OnReceive(Socket socket, byte[] buffer, int offset, int count);
+        void OnReceive(GWSocket socket, byte[] buffer, int offset, int count);
+                
+        void OnSend(GWSocket socket, byte[] buffer, int offset, int count);
+                
+        void OnCloseConnection(GWSocket socket, SocketError error);
         
-        void OnReceiveError(Socket socket, SocketError error);
-        
-        void OnSend(Socket socket, byte[] buffer, int offset, int count);
-        
-        void OnSendError(Socket socket, SocketError error);
-        
-        void OnCloseConnection(Socket socket, SocketError error);
-        
-        void OnCloseListener(Socket listener, SocketError error);
+        void OnCloseListener(GWSocket listener, SocketError error);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Net.Sockets;
+using OpenGW.Networking;
 
 namespace OpenGW.Proxy
 {
@@ -26,7 +27,7 @@ namespace OpenGW.Proxy
             }
         }
                 
-        public SocksProxyListener(ProxyServer server, Socket connectedSocket) : base(server, connectedSocket)
+        public SocksProxyListener(ProxyServer server, GWSocket connectedGwSocket) : base(server, connectedGwSocket)
         {
         }
 

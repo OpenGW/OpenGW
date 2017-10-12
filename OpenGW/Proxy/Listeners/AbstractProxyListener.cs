@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Sockets;
 using OpenGW.Networking;
 
@@ -7,23 +8,24 @@ namespace OpenGW.Proxy
     public abstract class AbstractProxyListener
     {
         public ProxyServer Server { get; }
-        public Socket ConnectedSocket { get; }
+        public GWSocket ConnectedGwSocket { get; }
 
-        protected AbstractProxyListener(ProxyServer server, Socket connectedSocket)
+        protected AbstractProxyListener(ProxyServer server, GWSocket connectedGwSocket)
         {
+            Debug.Assert(connectedGwSocket.Type == GWSocketType.TcpServerConnection);
+            
             this.Server = server;
-            this.ConnectedSocket = connectedSocket;
+            this.ConnectedGwSocket = connectedGwSocket;
         }
 
         public void StartSend(byte[] buffer, int offset, int count)
         {
-            SocketOperation.StartSend(this.Server, this.ConnectedSocket, buffer, offset, count);
+            SocketOperation.StartSend(this.Server, this.ConnectedGwSocket, buffer, offset, count);
         }
 
         public void Close()
         {
-            this.ConnectedSocket.Shutdown(SocketShutdown.Both);
-            this.ConnectedSocket.Dispose();
+            this.ConnectedGwSocket.Close();
         }
         
         public abstract void OnReceiveData(byte[] buffer, int offset, int count);

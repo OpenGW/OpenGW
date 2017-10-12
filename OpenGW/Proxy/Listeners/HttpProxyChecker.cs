@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
+using OpenGW.Networking;
 
 namespace OpenGW.Proxy
 {
@@ -96,13 +97,13 @@ namespace OpenGW.Proxy
                 headers[key] = value;
             }
             
-            proxyListener = new HttpProxyListener(this.ProxyServer, this.ConnectedSocket, httpVersion, hostname, headers);
+            proxyListener = new HttpProxyListener(this.ProxyServer, this.ConnectedGwSocket, httpVersion, hostname, headers);
             unusedBytes = firstBytes.Count - (this.m_LastScanPosition + 1);
             return ProxyCheckerResult.Success;
         }
 
-        public HttpProxyChecker(ProxyServer proxyServer, Socket connectedSocket) 
-            : base(proxyServer, connectedSocket)
+        public HttpProxyChecker(ProxyServer proxyServer, GWSocket connectedGwSocket) 
+            : base(proxyServer, connectedGwSocket)
         {
         }
     }
