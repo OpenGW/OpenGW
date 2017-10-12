@@ -17,7 +17,7 @@ namespace OpenGW.Proxy
             = new Regex(@"^CONNECT(\s+)(?<HOSTNAME>\S+)(\s+)HTTP/(?<HTTP_VERSION>[0-9\.]+)(\s*\r?\n)((?<HEADERS>[^\n]+?)\r?\n)*(\r?\n)$",
                 RegexOptions.Compiled | RegexOptions.ExplicitCapture | RegexOptions.IgnoreCase);
         
-        public static ProxyCheckerResult TryThisProxy(List<byte> firstBytes)
+        public static ProxyCheckerResult TryThisProxy(ProxyServer server, GWSocket gwSocket, List<byte> firstBytes)
         {            
 
             for (int i = Math.Min(CONNECT_UPPER.Length, firstBytes.Count) - 1; i >= 0; --i)

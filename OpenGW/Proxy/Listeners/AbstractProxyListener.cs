@@ -20,7 +20,7 @@ namespace OpenGW.Proxy
 
         public void StartSend(byte[] buffer, int offset, int count)
         {
-            SocketOperation.StartSend(this.Server, this.ConnectedGwSocket, buffer, offset, count);
+            this.Server.StartSend(this.ConnectedGwSocket, buffer, offset, count);
         }
 
         public void Close()

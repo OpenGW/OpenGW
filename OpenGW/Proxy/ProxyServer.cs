@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices.ComTypes;
 using OpenGW.Networking;
@@ -57,7 +58,11 @@ namespace OpenGW.Proxy
         {
             this.m_ServerGwSocket.Close();
         }
-        
+
+        public void StartSend(GWSocket connectedSocket, byte[] buffer, int offset, int count)
+        {
+            SocketOperation.StartSend(this, connectedSocket, buffer, offset, count);
+        }
         
         void ISocketEvent.OnAccept(GWSocket listener, GWSocket acceptGwSocket)
         {
@@ -188,5 +193,13 @@ namespace OpenGW.Proxy
             // TODO: Log
             Console.WriteLine($"[CloseListener] ({listener}) {error}");
         }
+        
+        public IPAddress[] DnsQuery(string hostOrIp)
+        {
+            // TODO
+            Console.WriteLine($"Trying to resolve: {hostOrIp}");
+            return Dns.GetHostAddressesAsync(hostOrIp).Result;
+        }
+
     }
 }

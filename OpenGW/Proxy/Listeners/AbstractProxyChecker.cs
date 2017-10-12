@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using OpenGW.Networking;
 
@@ -24,9 +25,9 @@ namespace OpenGW.Proxy
                 s_AtLeastOneUncertain = new []{false};
             }
             
-            bool TryCheckOne(Func<List<byte>, ProxyCheckerResult> funcTryThisProxy)
+            bool TryCheckOne(Func<ProxyServer, GWSocket, List<byte>, ProxyCheckerResult> funcTryThisProxy)
             {
-                switch (funcTryThisProxy(firstBytes))
+                switch (funcTryThisProxy(proxyServer, connectedSocket, firstBytes))
                 {
                     case ProxyCheckerResult.Success:
                         return true;

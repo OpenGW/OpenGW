@@ -463,7 +463,7 @@ namespace OpenGW.Networking
             try
             {
                 saea.SetBuffer(buffer, offset, count);
-                
+
                 isAsync = token.GwSocket.Socket.SendAsync(saea);
                 error = SocketError.Success;
             }
@@ -471,6 +471,10 @@ namespace OpenGW.Networking
             {
                 Debug.Assert(ex.SocketErrorCode != SocketError.Success);
                 error = ex.SocketErrorCode;
+            }
+            catch (ObjectDisposedException)
+            {
+                error = SocketError.SocketError;
             }
 
             
