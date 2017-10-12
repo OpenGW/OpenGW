@@ -80,14 +80,16 @@ namespace OpenGW.Proxy
                 byte[] localEndpointPortBytes = new byte[2]
                 {  // network order
                     (byte)(localEndpointPort >> 16), 
-                    (byte)(localEndpointPort & 0xFF)
+                    (byte)(localEndpointPort)
                 };
                 
                 List<byte> response = new List<byte>(32);
-                response.Add((byte)0x05);  // VER: 0x05
-                response.Add((byte)0x00);  // REP: succeeded
-                response.Add((byte)0x00);  // REV: RESERVED
-                response.Add(localEndpointIsIPv4 ? (byte)0x01 : (byte)0x04);  // ATYP: IPv4 = 0x01, IPv6 = 0x04
+                response.Add(SocksConst.SOCKS5_VER);  // VER: Socks 5
+                response.Add(SocksConst.SOCKS5_CONNECT_REP_SUCCEEDED);  // REP: succeeded
+                response.Add(SocksConst.RESERVED);  // REV: RESERVED
+                response.Add(localEndpointIsIPv4 
+                    ? SocksConst.SOCKS5_BYTE_ATYPE_IPV4 
+                    : SocksConst.SOCKS5_BYTE_ATYPE_IPV6);  // ATYP
                 response.AddRange(((IPEndPoint)this.m_Socket.LocalEndPoint).Address.GetAddressBytes());  // local endpoint ip
                 response.AddRange(localEndpointPortBytes);  // local endpoint port
 
@@ -121,10 +123,10 @@ namespace OpenGW.Proxy
                 Console.WriteLine(ex);
                 
                 List<byte> response = new List<byte>(32);
-                response.Add((byte)0x05);  // VER: 0x05
-                response.Add((byte)0x01);  // REP: general SOCKS server failure
-                response.Add((byte)0x00);  // REV: RESERVED
-                response.Add(0x01);  // ATYP: IPv4 = 0x01, IPv6 = 0x04
+                response.Add(SocksConst.SOCKS5_VER);  // VER: Socks 5
+                response.Add(SocksConst.SOCKS5_CONNECT_REP_GENERAL_FAILURE);  // REP: error
+                response.Add(SocksConst.RESERVED);  // REV: RESERVED
+                response.Add(SocksConst.SOCKS5_BYTE_ATYPE_IPV4);  // ATYP
                 response.AddRange(new byte[4]);  // local endpoint ip
                 response.AddRange(new byte[2]);  // local endpoint port
 

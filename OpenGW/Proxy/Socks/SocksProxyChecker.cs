@@ -12,29 +12,19 @@ namespace OpenGW.Proxy
 {
     public class SocksProxyChecker : AbstractProxyChecker
     {
-        private const byte SOCKS4_BYTE_VERSION = 0x04;
-        private const byte SOCKS5_BYTE_VERSION = 0x05;
-
-        private const byte SOCKS5_BYTE_CMD_CONNECT = 0x01;
-        private const byte SOCKS5_BYTE_CMD_BIND = 0x02;
-        private const byte SOCKS5_BYTE_CMD_UDP_ASSOCIATE = 0x03;
-        
-        private const byte SOCKS5_BYTE_ATYPE_IPV4 = 0x01;
-        private const byte SOCKS5_BYTE_ATYPE_DOMAINNAME = 0x03;
-        private const byte SOCKS5_BYTE_ATYPE_IPV6 = 0x04;
-        
+       
         
         
         private static ProxyCheckerResult TrySocksV4(ProxyServer server, GWSocket gwSocket, List<byte> firstBytes)
         {
-            Debug.Assert(firstBytes[0] == SOCKS4_BYTE_VERSION);
+            Debug.Assert(firstBytes[0] == SocksConst.SOCKS4_VER);
             
             throw new NotImplementedException();
         }
         
         private static ProxyCheckerResult TrySocksV5(ProxyServer server, GWSocket gwSocket, List<byte> firstBytes)
         {
-            Debug.Assert(firstBytes[0] == SOCKS5_BYTE_VERSION);
+            Debug.Assert(firstBytes[0] == SocksConst.SOCKS5_VER);
             
             /*
                +----+----------+----------+
@@ -43,7 +33,7 @@ namespace OpenGW.Proxy
                | 1  |    1     | 1 to 255 |
                +----+----------+----------+
             */
-            Debug.Assert(firstBytes[0] == SOCKS5_BYTE_VERSION);
+            Debug.Assert(firstBytes[0] == SocksConst.SOCKS5_VER);
             int nMethods = (int)firstBytes[1];
             if (firstBytes.Count < 2 + nMethods)
             {
@@ -61,10 +51,10 @@ namespace OpenGW.Proxy
 
             switch (firstBytes[0])
             {
-                case SOCKS4_BYTE_VERSION:  // SOCKS 4 / 4a
+                case SocksConst.SOCKS4_VER:  // SOCKS 4 / 4a
                     return SocksProxyChecker.TrySocksV4(server, gwSocket, firstBytes);
                     
-                case SOCKS5_BYTE_VERSION:  // SOCKS 5
+                case SocksConst.SOCKS5_VER:  // SOCKS 5
                     return SocksProxyChecker.TrySocksV5(server, gwSocket, firstBytes);
                     
                 default:
@@ -85,7 +75,7 @@ namespace OpenGW.Proxy
             out AbstractProxyListener proxyListener,
             out int unusedBytes)
         {
-            Debug.Assert(firstBytes[0] == SOCKS4_BYTE_VERSION);
+            Debug.Assert(firstBytes[0] == SocksConst.SOCKS4_VER);
             
             throw new NotImplementedException();
         }
@@ -98,7 +88,7 @@ namespace OpenGW.Proxy
             proxyListener = null;
             unusedBytes = 0;
             
-            Debug.Assert(firstBytes[0] == SOCKS5_BYTE_VERSION);
+            Debug.Assert(firstBytes[0] == SocksConst.SOCKS5_VER);
 
             /*
                The values currently defined for METHOD are:
@@ -126,25 +116,20 @@ namespace OpenGW.Proxy
                 this.m_Authenticated = true;
 
                 
-                const byte AUTH_NO_AUTHENTICATION_REQUIRED = 0x00;
-                const byte AUTH_GSSAPI = 0x01;
-                const byte AUTH_USERNAME_PASSWORD = 0x02;
-                const byte AUTH_NO_ACCEPTABLE_METHODS = 0xFF;
-
                 ArraySegment<byte> authMethods = new ArraySegment<byte>(firstBytes.ToArray(), 2, nMethods);
             
                 // TODO: Check configuration now!
                 byte[] response = new byte[2];
-                response[0] = SOCKS5_BYTE_VERSION;            
-                if (!authMethods.Contains(AUTH_NO_AUTHENTICATION_REQUIRED))
+                response[0] = SocksConst.SOCKS5_VER;            
+                if (!authMethods.Contains(SocksConst.SOCKS5_AUTHMETHOD_NO_AUTHENTICATION_REQUIRED))
                 {
                     this.m_AuthenticationSuccessful = false;
-                    response[1] = AUTH_NO_ACCEPTABLE_METHODS;
+                    response[1] = SocksConst.SOCKS5_AUTHMETHOD_NO_ACCEPTABLE_METHODS;
                 }
                 else
                 {
                     this.m_AuthenticationSuccessful = true;
-                    response[1] = AUTH_NO_AUTHENTICATION_REQUIRED;
+                    response[1] = SocksConst.SOCKS5_AUTHMETHOD_NO_AUTHENTICATION_REQUIRED;
                 }
             
                 // Send the response
@@ -210,9 +195,9 @@ namespace OpenGW.Proxy
             byte[] firstBytesArray = firstBytes.ToArray();
             
             byte cmd = firstBytes[ptrOffset + 1];
-            if (cmd != SOCKS5_BYTE_CMD_CONNECT &&
-                cmd != SOCKS5_BYTE_CMD_BIND &&
-                cmd != SOCKS5_BYTE_CMD_UDP_ASSOCIATE)
+            if (cmd != SocksConst.SOCKS5_BYTE_CMD_CONNECT &&
+                cmd != SocksConst.SOCKS5_BYTE_CMD_BIND &&
+                cmd != SocksConst.SOCKS5_BYTE_CMD_UDP_ASSOCIATE)
             {
                 return ProxyCheckerResult.Failed;
             }
@@ -223,21 +208,21 @@ namespace OpenGW.Proxy
             int dstAddrLength;
             switch (aType)
             {
-                case SOCKS5_BYTE_ATYPE_IPV4:
+                case SocksConst.SOCKS5_BYTE_ATYPE_IPV4:
                     dstAddrLength = 4;
                     if (firstBytes.Count < ptrOffset + 4 + dstAddrLength + 2) return ProxyCheckerResult.Uncertain;
                     IList<byte> ipv4 = new ArraySegment<byte>(firstBytesArray, ptrOffset + 4, dstAddrLength);
                     string strIPv4 = $"{ipv4[0]}.{ipv4[1]}.{ipv4[2]}.{ipv4[3]}";
                     dstAddrs.Add(IPAddress.Parse(strIPv4));
                     break;
-                case SOCKS5_BYTE_ATYPE_DOMAINNAME:
+                case SocksConst.SOCKS5_BYTE_ATYPE_DOMAINNAME:
                     dstAddrLength = 1 + (int)firstBytes[ptrOffset + 4];
                     if (firstBytes.Count < ptrOffset + 4 + dstAddrLength + 2) return ProxyCheckerResult.Uncertain;
                     string hostname = Encoding.ASCII.GetString(
                         new ArraySegment<byte>(firstBytesArray, ptrOffset + 4 + 1, dstAddrLength - 1).ToArray());
                     dstAddrs.AddRange(this.ProxyServer.DnsQuery(hostname));
                     break;
-                case SOCKS5_BYTE_ATYPE_IPV6:
+                case SocksConst.SOCKS5_BYTE_ATYPE_IPV6:
                     dstAddrLength = 16;
                     if (firstBytes.Count < ptrOffset + 4 + dstAddrLength + 2) return ProxyCheckerResult.Uncertain;
                     byte[] ipv6 = new ArraySegment<byte>(firstBytesArray, ptrOffset + 4, dstAddrLength).ToArray();
@@ -262,15 +247,15 @@ namespace OpenGW.Proxy
             ptrOffset += 2;
             switch (cmd)
             {
-                case SOCKS5_BYTE_CMD_CONNECT:
+                case SocksConst.SOCKS5_BYTE_CMD_CONNECT:
                     unusedBytes = firstBytes.Count - ptrOffset;
                     proxyListener = new Socks5TcpConnectProxyListener(this.ProxyServer, this.ConnectedGwSocket, dstAddrs, port);
                     return ProxyCheckerResult.Success;
 
-                case SOCKS5_BYTE_CMD_BIND:
+                case SocksConst.SOCKS5_BYTE_CMD_BIND:
                     return ProxyCheckerResult.Failed;  // TODO
                 
-                case SOCKS5_BYTE_CMD_UDP_ASSOCIATE:
+                case SocksConst.SOCKS5_BYTE_CMD_UDP_ASSOCIATE:
                     return ProxyCheckerResult.Failed;  // TODO
                 
                 default:
@@ -285,13 +270,13 @@ namespace OpenGW.Proxy
             out AbstractProxyListener proxyListener, 
             out int unusedBytes)
         {
-            if (firstBytes[0] == SOCKS4_BYTE_VERSION)
+            if (firstBytes[0] == SocksConst.SOCKS4_VER)
             {
                 return this.InitializeSocksV4(firstBytes, out proxyListener, out unusedBytes);
             }
             else
             {
-                Debug.Assert(firstBytes[0] == SOCKS5_BYTE_VERSION);
+                Debug.Assert(firstBytes[0] == SocksConst.SOCKS5_VER);
                 return this.InitializeSocksV5(firstBytes, out proxyListener, out unusedBytes);
             }            
         }
