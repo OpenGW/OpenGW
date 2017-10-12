@@ -19,6 +19,12 @@ namespace OpenGW.Proxy
         {
             SocketOperation.StartSend(this.Server, this.ConnectedSocket, buffer, offset, count);
         }
+
+        public void Close()
+        {
+            this.ConnectedSocket.Shutdown(SocketShutdown.Both);
+            this.ConnectedSocket.Dispose();
+        }
         
         public abstract void OnReceiveData(byte[] buffer, int offset, int count);
 

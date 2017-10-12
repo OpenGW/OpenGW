@@ -4,7 +4,7 @@ using System.Net.Sockets;
 namespace OpenGW.Networking
 {
     public interface ISocketEvent
-    {
+    {        
         void OnAccept(Socket listener, Socket acceptSocket);
 
         void OnAcceptError(Socket listener, SocketError error);
