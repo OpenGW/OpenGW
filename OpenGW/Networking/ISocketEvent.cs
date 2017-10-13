@@ -4,9 +4,10 @@ using System.Net.Sockets;
 namespace OpenGW.Networking
 {
     public interface ISocketEvent
-    {        
+    {   
         void OnAccept(GWSocket listener, GWSocket acceptSocket);
-
+        //event Action<GWSocket, GWSocket> OnAccept;
+        
         void OnAcceptError(GWSocket listener, SocketError error);
         
         void OnConnect(GWSocket connectedSocket);

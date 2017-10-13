@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using OpenGW.Networking;
 
@@ -14,7 +15,7 @@ namespace OpenGW.Proxy
 
         public int Port { get; }
 
-        private Socket m_Socket;
+        private GWClient m_Client;
         
         
         public Socks5TcpConnectProxyListener(
@@ -69,86 +70,90 @@ namespace OpenGW.Proxy
                request.
                 
             */
-            try
+            IPAddress ip = this.IPAddresses[0];
+            Socket clientSocket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            ManualResetEventSlim mreConnect = new ManualResetEventSlim(false);
+            ManualResetEventSlim mreRespSent = new ManualResetEventSlim(false);
+
+            Wrapper<bool> success = (Wrapper<bool>)false;
+            this.m_Client = new GWClient(clientSocket, new IPEndPoint(ip, port));
+            this.m_Client.OnReceive += (gwSocket, buffer, offset, count) =>
             {
-                IPAddress ip = this.IPAddresses[0];
-                this.m_Socket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-                this.m_Socket.Connect(new IPEndPoint(ip, port));
-
-                bool localEndpointIsIPv4 = (this.m_Socket.LocalEndPoint.AddressFamily == AddressFamily.InterNetwork);
-                ushort localEndpointPort = (ushort)((IPEndPoint)this.m_Socket.LocalEndPoint).Port;
-                byte[] localEndpointPortBytes = new byte[2]
-                {  // network order
-                    (byte)(localEndpointPort >> 16), 
-                    (byte)(localEndpointPort)
-                };
-                
-                List<byte> response = new List<byte>(32);
-                response.Add(SocksConst.SOCKS5_VER);  // VER: Socks 5
-                response.Add(SocksConst.SOCKS5_CONNECT_REP_SUCCEEDED);  // REP: succeeded
-                response.Add(SocksConst.RESERVED);  // REV: RESERVED
-                response.Add(localEndpointIsIPv4 
-                    ? SocksConst.SOCKS5_BYTE_ATYPE_IPV4 
-                    : SocksConst.SOCKS5_BYTE_ATYPE_IPV6);  // ATYP
-                response.AddRange(((IPEndPoint)this.m_Socket.LocalEndPoint).Address.GetAddressBytes());  // local endpoint ip
-                response.AddRange(localEndpointPortBytes);  // local endpoint port
-
-                this.StartSend(response.ToArray(), 0, response.Count);
-
-                Task.Run(() =>
-                {
-                    while (true)
-                    {
-                        try
-                        {
-                            byte[] buffer = new byte[4096];
-                            int recvCnt = this.m_Socket.Receive(buffer);
-                            if (recvCnt == 0)
-                            {
-                                break;
-                            }
-
-                            this.StartSend(buffer, 0, recvCnt);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine(ex);
-                            break;
-                        }
-                    }
-                });
-            }
-            catch (Exception ex)
+                mreRespSent.Wait();
+                this.StartSend(buffer, offset, count);
+            };
+            this.m_Client.OnCloseConnection += (gwSocket, error) =>
             {
-                Console.WriteLine(ex);
+                mreRespSent.Set();
+                this.Close();
+            };
+            this.m_Client.OnConnect += gwSocket =>
+            {
+                success.Value = true;
+                mreConnect.Set();
+            };
+            this.m_Client.OnConnectError += (gwSocket, error) =>
+            {
+                Console.WriteLine($"[SOCKS] Server failed to connect {new IPEndPoint(ip, port)}: {error}");
                 
-                List<byte> response = new List<byte>(32);
-                response.Add(SocksConst.SOCKS5_VER);  // VER: Socks 5
-                response.Add(SocksConst.SOCKS5_CONNECT_REP_GENERAL_FAILURE);  // REP: error
-                response.Add(SocksConst.RESERVED);  // REV: RESERVED
-                response.Add(SocksConst.SOCKS5_BYTE_ATYPE_IPV4);  // ATYP
-                response.AddRange(new byte[4]);  // local endpoint ip
-                response.AddRange(new byte[2]);  // local endpoint port
+                List<byte> badResponse = new List<byte>(32);
+                badResponse.Add(SocksConst.SOCKS5_VER);  // VER: Socks 5
+                badResponse.Add(SocksConst.SOCKS5_CONNECT_REP_GENERAL_FAILURE);  // REP: error
+                badResponse.Add(SocksConst.RESERVED);  // REV: RESERVED
+                badResponse.Add(SocksConst.SOCKS5_BYTE_ATYPE_IPV4);  // ATYP
+                badResponse.AddRange(new byte[4]);  // local endpoint ip
+                badResponse.AddRange(new byte[2]);  // local endpoint port
 
-                this.StartSend(response.ToArray(), 0, response.Count);
+                this.StartSend(badResponse.ToArray(), 0, badResponse.Count);
+
+                success.Value = false;
+                mreConnect.Set();
+                mreRespSent.Set();
+            };
+            this.m_Client.StartConnect();
+            mreConnect.Wait();
+
+            // SOCKS server is not successfully connected
+            if (!success.Value)
+            {
+                this.Close();
             }
+            
+            
+            //IPEndPoint localEp = this.m_Client.GwSocket.LocalEndPointCache; // TODO: Can be null sometimes - why?
+            IPEndPoint localEp = (IPEndPoint)this.m_Client.GwSocket.Socket.LocalEndPoint;
+            Debug.Assert(localEp != null);
+            bool localEndpointIsIPv4 = (localEp.AddressFamily == AddressFamily.InterNetwork);
+            ushort localEndpointPort = (ushort)localEp.Port;
+            byte[] localEndpointPortBytes = new byte[2]
+            {  // network order
+                (byte)(localEndpointPort >> 16), 
+                (byte)(localEndpointPort)
+            };
+            
+            List<byte> response = new List<byte>(32);
+            response.Add(SocksConst.SOCKS5_VER);  // VER: Socks 5
+            response.Add(SocksConst.SOCKS5_CONNECT_REP_SUCCEEDED);  // REP: succeeded
+            response.Add(SocksConst.RESERVED);  // REV: RESERVED
+            response.Add(localEndpointIsIPv4 
+                ? SocksConst.SOCKS5_BYTE_ATYPE_IPV4 
+                : SocksConst.SOCKS5_BYTE_ATYPE_IPV6);  // ATYP
+            response.AddRange(localEp.Address.GetAddressBytes());  // local endpoint ip
+            response.AddRange(localEndpointPortBytes);  // local endpoint port
+
+            this.StartSend(response.ToArray(), 0, response.Count);            
+            mreRespSent.Set();
         }
 
         public override void OnReceiveData(byte[] buffer, int offset, int count)
         {
-            int sendCnt = this.m_Socket.Send(buffer, offset, count, SocketFlags.None);
-            Debug.Assert(sendCnt == count);
+            this.m_Client.StartSend(buffer, offset, count);
         }
 
         public override void OnCloseConnection(SocketError status)
         {
             Console.WriteLine($"[SOCKS5-CONNECT] Close: {status}");
-            try {
-                this.m_Socket.Shutdown(SocketShutdown.Both);
-            }
-            catch (Exception ex) {
-                Console.WriteLine(ex);
-            }
+            this.m_Client.Close();  // TODO: Check what if m_Client not connected?
         }
     }
 }

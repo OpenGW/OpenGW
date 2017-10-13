@@ -42,6 +42,11 @@ namespace OpenGW.Networking
                     break;
                 case GWSocketType.TcpServerConnection:
                 case GWSocketType.TcpClientConnection:
+                    if (!this.Socket.Connected)
+                    {
+                        return;
+                    } 
+                    
                     this.Socket.Shutdown(SocketShutdown.Both);
                     //this.Socket.Dispose();  // do not dispose it?
                     break;
