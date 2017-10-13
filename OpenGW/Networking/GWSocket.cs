@@ -43,7 +43,7 @@ namespace OpenGW.Networking
                 case GWSocketType.TcpServerConnection:
                 case GWSocketType.TcpClientConnection:
                     this.Socket.Shutdown(SocketShutdown.Both);
-                    this.Socket.Dispose();
+                    //this.Socket.Dispose();  // do not dispose it?
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();

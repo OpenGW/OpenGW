@@ -44,7 +44,7 @@ namespace OpenGW.Proxy
             {
                 serverSocket.DualMode = this.Configuration.DualModeIfPossible;
             }
-            serverSocket.LingerState = new LingerOption(true, 0);  // don't linger
+            //serverSocket.LingerState = new LingerOption(true, 0);  // don't linger
             
             serverSocket.Bind(this.Configuration.ListenEndpoint);
             
@@ -194,11 +194,19 @@ namespace OpenGW.Proxy
             Console.WriteLine($"[CloseListener] ({listener}) {error}");
         }
         
+        private ConcurrentDictionary<string, IPAddress[]> m_DnsResult = new ConcurrentDictionary<string, IPAddress[]>();
+        
         public IPAddress[] DnsQuery(string hostOrIp)
         {
             // TODO
-            Console.WriteLine($"Trying to resolve: {hostOrIp}");
-            return Dns.GetHostAddressesAsync(hostOrIp).Result;
+            return this.m_DnsResult.GetOrAdd(hostOrIp, 
+                dummy =>
+                {
+                    Stopwatch watch = Stopwatch.StartNew();
+                    IPAddress[] result = Dns.GetHostAddressesAsync(hostOrIp).Result;
+                    Console.WriteLine($"Trying to resolve: {hostOrIp} ({watch.Elapsed})");
+                    return result;
+                });
         }
 
     }
