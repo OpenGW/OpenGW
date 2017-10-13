@@ -197,14 +197,17 @@ namespace OpenGW.Proxy
         public IPAddress[] DnsQuery(string hostOrIp)
         {
             // TODO
-            return this.m_DnsResult.GetOrAdd(hostOrIp, 
-                dummy =>
-                {
-                    Stopwatch watch = Stopwatch.StartNew();
-                    IPAddress[] result = Dns.GetHostAddressesAsync(hostOrIp).Result;
-                    Logger.Debug($"Trying to resolve: {hostOrIp} ({watch.Elapsed})");
-                    return result;
-                });
+            lock (hostOrIp.GetLockObject())
+            {
+                return this.m_DnsResult.GetOrAdd(hostOrIp, 
+                    dummy =>
+                    {
+                        Stopwatch watch = Stopwatch.StartNew();
+                        IPAddress[] result = Dns.GetHostAddressesAsync(hostOrIp).Result;
+                        Logger.Debug($"Trying to resolve: {hostOrIp} ({watch.Elapsed})");
+                        return result;
+                    });
+            }
         }
 
     }

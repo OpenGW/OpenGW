@@ -17,6 +17,15 @@ namespace OpenGW
             return s.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
         }
 
+        private static readonly ConcurrentDictionary<string, object> s_StringSyncObjects
+            = new ConcurrentDictionary<string, object>();
+        
+        public static object GetLockObject(this string str)
+        {
+            return s_StringSyncObjects.GetOrAdd(str, (dummy) => new object());
+        }
+            
+            
         
         private class ObjectReferenceEqualityComparer : IEqualityComparer<(object, string, int)>
         {
