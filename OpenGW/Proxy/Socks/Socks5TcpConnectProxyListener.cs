@@ -97,12 +97,12 @@ namespace OpenGW.Proxy
                 badResponse.AddRange(new byte[4]);  // local endpoint ip
                 badResponse.AddRange(new byte[2]);  // local endpoint port
 
-                this.StartSend(badResponse.ToArray(), 0, badResponse.Count);
+                this.AsyncSend(badResponse.ToArray(), 0, badResponse.Count);
 
                 success.Value = false;
                 mreConnect.Set();
             };
-            this.m_Client.StartConnect();
+            this.m_Client.AsyncConnect();
             mreConnect.Wait();
 
             // SOCKS server is not successfully connected
@@ -134,18 +134,18 @@ namespace OpenGW.Proxy
             response.AddRange(localEp.Address.GetAddressBytes());  // local endpoint ip
             response.AddRange(localEndpointPortBytes);  // local endpoint port
 
-            this.StartSend(response.ToArray(), 0, response.Count);
+            this.AsyncSend(response.ToArray(), 0, response.Count);
             
             this.m_Client.OnReceive += (gwSocket, buffer, offset, count) =>
             {
-                this.StartSend(buffer, offset, count);
+                this.AsyncSend(buffer, offset, count);
             };
             this.m_Client.StartReceive();
         }
 
         public override void OnReceiveData(byte[] buffer, int offset, int count)
         {
-            this.m_Client.StartSend(buffer, offset, count);
+            this.m_Client.AsyncSend(buffer, offset, count);
         }
 
         public override void OnCloseConnection(SocketError status)

@@ -58,14 +58,14 @@ namespace OpenGW.Proxy
                             break;
                         }
 
-                        this.StartSend(buffer, 0, cnt);
+                        this.AsyncSend(buffer, 0, cnt);
                     }
                 });
 
                 Console.WriteLine($"[HttpProxy] Proxy: {hostOrIp}:{port} (HTTP/{httpVersion})");
                 
                 byte[] response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\n\r\n");
-                this.StartSend(response, 0, response.Length);
+                this.AsyncSend(response, 0, response.Length);
             }
             catch(Exception ex)
             {

@@ -18,9 +18,9 @@ namespace OpenGW.Proxy
             this.ConnectedGwSocket = connectedGwSocket;
         }
 
-        public void StartSend(byte[] buffer, int offset, int count)
+        public void AsyncSend(byte[] buffer, int offset, int count)
         {
-            this.Server.StartSend(this.ConnectedGwSocket, buffer, offset, count);
+            this.Server.AsyncSend(this.ConnectedGwSocket, buffer, offset, count);
         }
 
         public void Close()

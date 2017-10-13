@@ -68,9 +68,9 @@ namespace OpenGW.Networking
             this.GwSocket = new GWSocket(socket, GWSocketType.TcpClientConnection);
         }
 
-        public void StartConnect()
+        public void AsyncConnect()
         {
-            SocketOperation.StartConnect(this, this.GwSocket, this.m_RemoteEp);
+            SocketOperation.AsyncConnect(this, this.GwSocket, this.m_RemoteEp);
         }
 
         public void StartReceive()
@@ -83,9 +83,9 @@ namespace OpenGW.Networking
             this.GwSocket.Close();
         }
 
-        public void StartSend(byte[] buffer, int offset, int count)
+        public void AsyncSend(byte[] buffer, int offset, int count)
         {
-            SocketOperation.StartSend(this, this.GwSocket, buffer, offset, count);
+            SocketOperation.AsyncSend(this, this.GwSocket, buffer, offset, count);
         }
     }
 }

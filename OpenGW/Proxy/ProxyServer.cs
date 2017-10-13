@@ -51,7 +51,7 @@ namespace OpenGW.Proxy
             serverSocket.Listen(0);
             
             this.m_ServerGwSocket = new GWSocket(serverSocket, GWSocketType.TcpServerListener);
-            SocketOperation.StartAccept(this, this.m_ServerGwSocket);
+            SocketOperation.AsyncAccept(this, this.m_ServerGwSocket);
         }
 
         public void Stop()
@@ -59,9 +59,9 @@ namespace OpenGW.Proxy
             this.m_ServerGwSocket.Close();
         }
 
-        public void StartSend(GWSocket connectedSocket, byte[] buffer, int offset, int count)
+        public void AsyncSend(GWSocket connectedSocket, byte[] buffer, int offset, int count)
         {
-            SocketOperation.StartSend(this, connectedSocket, buffer, offset, count);
+            SocketOperation.AsyncSend(this, connectedSocket, buffer, offset, count);
         }
         
         void ISocketEvent.OnAccept(GWSocket listener, GWSocket acceptGwSocket)

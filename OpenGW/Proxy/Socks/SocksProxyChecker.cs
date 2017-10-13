@@ -133,7 +133,7 @@ namespace OpenGW.Proxy
                 }
             
                 // Send the response
-                this.ProxyServer.StartSend(this.ConnectedGwSocket, response, 0, response.Length);
+                this.ProxyServer.AsyncSend(this.ConnectedGwSocket, response, 0, response.Length);
             
                 return ProxyCheckerResult.Uncertain;
             }
