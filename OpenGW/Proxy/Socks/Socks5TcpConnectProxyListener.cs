@@ -73,18 +73,11 @@ namespace OpenGW.Proxy
             IPAddress ip = this.IPAddresses[0];
             Socket clientSocket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             ManualResetEventSlim mreConnect = new ManualResetEventSlim(false);
-            ManualResetEventSlim mreRespSent = new ManualResetEventSlim(false);
 
             Wrapper<bool> success = (Wrapper<bool>)false;
             this.m_Client = new GWClient(clientSocket, new IPEndPoint(ip, port));
-            this.m_Client.OnReceive += (gwSocket, buffer, offset, count) =>
-            {
-                mreRespSent.Wait();
-                this.StartSend(buffer, offset, count);
-            };
             this.m_Client.OnCloseConnection += (gwSocket, error) =>
             {
-                mreRespSent.Set();
                 this.Close();
             };
             this.m_Client.OnConnect += gwSocket =>
@@ -108,7 +101,6 @@ namespace OpenGW.Proxy
 
                 success.Value = false;
                 mreConnect.Set();
-                mreRespSent.Set();
             };
             this.m_Client.StartConnect();
             mreConnect.Wait();
@@ -117,6 +109,7 @@ namespace OpenGW.Proxy
             if (!success.Value)
             {
                 this.Close();
+                return;
             }
             
             
@@ -141,8 +134,13 @@ namespace OpenGW.Proxy
             response.AddRange(localEp.Address.GetAddressBytes());  // local endpoint ip
             response.AddRange(localEndpointPortBytes);  // local endpoint port
 
-            this.StartSend(response.ToArray(), 0, response.Count);            
-            mreRespSent.Set();
+            this.StartSend(response.ToArray(), 0, response.Count);
+            
+            this.m_Client.OnReceive += (gwSocket, buffer, offset, count) =>
+            {
+                this.StartSend(buffer, offset, count);
+            };
+            this.m_Client.StartReceive();
         }
 
         public override void OnReceiveData(byte[] buffer, int offset, int count)
@@ -152,7 +150,10 @@ namespace OpenGW.Proxy
 
         public override void OnCloseConnection(SocketError status)
         {
-            Console.WriteLine($"[SOCKS5-CONNECT] Close: {status}");
+            if (status != SocketError.Success)
+            {
+                Console.WriteLine($"[SOCKS5-CONNECT] Close: {status}");
+            }
             this.m_Client.Close();  // TODO: Check what if m_Client not connected?
         }
     }

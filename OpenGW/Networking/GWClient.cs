@@ -73,6 +73,11 @@ namespace OpenGW.Networking
             SocketOperation.StartConnect(this, this.GwSocket, this.m_RemoteEp);
         }
 
+        public void StartReceive()
+        {
+            SocketOperation.StartClientReceive(this, this.GwSocket);
+        }
+        
         public void Close()
         {
             this.GwSocket.Close();

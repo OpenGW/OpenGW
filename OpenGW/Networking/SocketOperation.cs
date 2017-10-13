@@ -173,7 +173,8 @@ namespace OpenGW.Networking
                 s_ActiveConnectedSockets.TryAdd(token.GwSocket, true);  // true is dummy
                 
                 // Start receving on the accepted socket
-                SocketOperation.StartReceive(token.ClientOrServer, token.GwSocket);
+                // Now client tcp receiving must be started manually!
+                //SocketOperation.StartReceive(token.ClientOrServer, token.GwSocket);
             }
             else
             {
@@ -445,6 +446,12 @@ namespace OpenGW.Networking
             SocketOperation.StartReceiveInternal(saea);
         }
 
+        public static void StartClientReceive(ISocketEvent clientOrServer, GWSocket gwSocket)
+        {
+            Debug.Assert(gwSocket.Type == GWSocketType.TcpClientConnection);
+
+            SocketOperation.StartReceive(clientOrServer, gwSocket);
+        }
         
         public static void StartSend(ISocketEvent clientOrServer, GWSocket gwSocket, byte[] buffer, int offset, int count)
         {

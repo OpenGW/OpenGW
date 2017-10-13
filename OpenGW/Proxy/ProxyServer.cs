@@ -178,8 +178,11 @@ namespace OpenGW.Proxy
             Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnection);
             
             // TODO: Log
-            Console.WriteLine($"[CloseConnection] ({gwSocket}) {error}");
-            
+            if (error != SocketError.Success)
+            {
+                Console.WriteLine($"[CloseConnection] ({gwSocket}) {error}");
+            }
+                
             bool success = this.m_ActiveProxyListeners.TryRemove(gwSocket, out ProxyListenerInformation info);
             Debug.Assert(success);
             
