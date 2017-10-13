@@ -4,7 +4,7 @@ namespace OpenGW.Networking
 {
     public static class NetUtility
     {
-        private static Regex s_RegexEndpoint = 
+        private static readonly Regex s_RegexEndpoint = 
             new Regex(@"^(?<HOST>([^:]+)|(\[[A-Fa-z0-9:]+\]))(:(?<PORT>[0-9]+))?$",
                 RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.ExplicitCapture);
         

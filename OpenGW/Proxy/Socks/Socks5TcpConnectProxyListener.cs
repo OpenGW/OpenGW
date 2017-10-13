@@ -143,7 +143,12 @@ namespace OpenGW.Proxy
         public override void OnCloseConnection(SocketError status)
         {
             Console.WriteLine($"[SOCKS5-CONNECT] Close: {status}");
-            this.m_Socket.Shutdown(SocketShutdown.Both);
+            try {
+                this.m_Socket.Shutdown(SocketShutdown.Both);
+            }
+            catch (Exception ex) {
+                Console.WriteLine(ex);
+            }
         }
     }
 }
