@@ -44,6 +44,7 @@ namespace OpenGW.Networking
                 case GWSocketType.TcpClientConnection:
                     if (!this.Socket.Connected)
                     {
+                        Logger.Warn($"Attempt to close not-connected socket: {this}");
                         return;
                     } 
                     
@@ -57,7 +58,11 @@ namespace OpenGW.Networking
 
         public void UpdateEndPointCache()
         {
-            if (this.m_Closed) return;  // TODO: Log an error
+            if (this.m_Closed)
+            {
+                Logger.Error("Error! Attempt on a closed socket.");
+                return;
+            }
 
             switch (this.Type)
             {

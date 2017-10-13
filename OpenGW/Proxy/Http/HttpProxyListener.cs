@@ -23,27 +23,28 @@ namespace OpenGW.Proxy
             )
             : base(server, connectedGwSocket)
         {
-            //Console.WriteLine($"Happily accept a proxy connection: HTTP");
-            //Console.WriteLine($"Http    - {httpVersion}");
-            //Console.WriteLine($"Domain  - {endpoint}");
+            //Logger.Trace($"Happily accept a proxy connection: HTTP");
+            //Logger.Trace($"Http    - {httpVersion}");
+            //Logger.Trace($"Domain  - {endpoint}");
 
-            foreach (KeyValuePair<string,string> pair in headers)
-            {
-                //Console.WriteLine($"Header  - {pair.Key} = {pair.Value}");
-            }
+            //foreach (KeyValuePair<string,string> pair in headers)
+            //{
+                //Logger.Trace($"Header  - {pair.Key} = {pair.Value}");
+            //}
 
             if (!NetUtility.TrySplitHostAndPort(endpoint, out string hostOrIp, out int? optPort))
             {
-                Console.WriteLine($"Invalid endpoint: {endpoint}");
+                Logger.Error($"HTTP first line: Invalid endpoint: {endpoint}");
                 this.Close();  // TODO: Respond "invalid hostname"
             }
 
+            // TODO: Use GWClient here!
             int port = optPort ?? 80;
             try
             {
-                IPAddress[] ips = Dns.GetHostAddressesAsync(hostOrIp).Result;
-                string strIPs = string.Join(", ", ips.Select(ip => ip.ToString()));
-                Console.WriteLine($"[DNS] {hostOrIp} -> {strIPs}");
+                IPAddress[] ips = this.Server.DnsQuery(hostOrIp);
+                //string strIPs = string.Join(", ", ips.Select(ip => ip.ToString()));
+                //Logger.Trace($"[DNS] {hostOrIp} -> {strIPs}");
                 
                 this.m_Socket = new Socket(ips[0].AddressFamily, SocketType.Stream, ProtocolType.Tcp);
                 this.m_Socket.Connect(ips[0], port);
@@ -62,14 +63,14 @@ namespace OpenGW.Proxy
                     }
                 });
 
-                Console.WriteLine($"[HttpProxy] Proxy: {hostOrIp}:{port} (HTTP/{httpVersion})");
+                Logger.Debug($"[HttpProxy] Proxy: {hostOrIp}:{port} (HTTP/{httpVersion})");
                 
                 byte[] response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\n\r\n");
                 this.AsyncSend(response, 0, response.Length);
             }
             catch(Exception ex)
             {
-                Console.WriteLine(ex);
+                Logger.Warn(ex);
                 this.Close();
             }
             
@@ -77,14 +78,14 @@ namespace OpenGW.Proxy
 
         public override void OnReceiveData(byte[] buffer, int offset, int count)
         {
-            //Console.WriteLine($"[Receive] Offset = {offset}, Count = {count}");
+            //Logger.Trace($"[Receive] Offset = {offset}, Count = {count}");
             int sent = this.m_Socket.Send(buffer, offset, count, SocketFlags.None);
             Debug.Assert(sent == count);
         }
 
         public override void OnCloseConnection(SocketError status)
         {
-            
+            // TODO: Close m_Socket
         }
     }
 }

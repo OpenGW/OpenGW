@@ -87,7 +87,7 @@ namespace OpenGW.Proxy
             };
             this.m_Client.OnConnectError += (gwSocket, error) =>
             {
-                Console.WriteLine($"[SOCKS] Server failed to connect {new IPEndPoint(ip, port)}: {error}");
+                Logger.Error($"[SOCKS] Server failed to connect {new IPEndPoint(ip, port)}: {error}");
                 
                 List<byte> badResponse = new List<byte>(32);
                 badResponse.Add(SocksConst.SOCKS5_VER);  // VER: Socks 5
@@ -152,9 +152,9 @@ namespace OpenGW.Proxy
         {
             if (status != SocketError.Success)
             {
-                Console.WriteLine($"[SOCKS5-CONNECT] Close: {status}");
+                Logger.Error($"SOCKS 5 proxy: {status}");
             }
-            this.m_Client.Close();  // TODO: Check what if m_Client not connected?
+            this.m_Client.Close();  // OK even if m_Client is not connected!
         }
     }
 }

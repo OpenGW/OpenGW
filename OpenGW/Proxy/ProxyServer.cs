@@ -64,12 +64,11 @@ namespace OpenGW.Proxy
             SocketOperation.AsyncSend(this, connectedSocket, buffer, offset, count);
         }
         
-        void ISocketEvent.OnAccept(GWSocket listener, GWSocket acceptGwSocket)
+        void ISocketEvent.OnAccept(GWSocket gwListener, GWSocket acceptGwSocket)
         {
-            Debug.Assert(listener.Type == GWSocketType.TcpServerListener);
+            Debug.Assert(gwListener.Type == GWSocketType.TcpServerListener);
 
-            // TODO: Log
-            // Console.WriteLine($"[Accept]");
+            Logger.Trace($"[S@] {gwListener} Accept: {acceptGwSocket}");
 
             bool success = this.m_ActiveProxyListeners.TryAdd(acceptGwSocket, new ProxyListenerInformation());
             Debug.Assert(success);
@@ -79,8 +78,7 @@ namespace OpenGW.Proxy
         {
             Debug.Assert(gwListener.Type == GWSocketType.TcpServerListener);
             
-            // TODO: Log
-            Console.WriteLine($"[AcceptError] ({gwListener}) {error}");
+            Logger.Error($"[S@] {gwListener} AcceptError: {error}");
         }
 
         void ISocketEvent.OnConnect(GWSocket connectedSocket)
@@ -169,18 +167,16 @@ namespace OpenGW.Proxy
 
         void ISocketEvent.OnSend(GWSocket gwSocket, byte[] buffer, int offset, int count)
         {
-            // TODO: Log
-            //Console.WriteLine($"[Send]");
+            Logger.Trace($"[S>] Send to {gwSocket}: Count = {count}");
         }
 
         void ISocketEvent.OnCloseConnection(GWSocket gwSocket, SocketError error)
         {
             Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnection);
             
-            // TODO: Log
             if (error != SocketError.Success)
             {
-                Console.WriteLine($"[CloseConnection] ({gwSocket}) {error}");
+                Logger.Error($"[CloseConnection] ({gwSocket}) {error}");
             }
                 
             bool success = this.m_ActiveProxyListeners.TryRemove(gwSocket, out ProxyListenerInformation info);
@@ -193,8 +189,7 @@ namespace OpenGW.Proxy
         {
             Debug.Assert(listener.Type == GWSocketType.TcpServerListener);
             
-            // TODO: Log
-            Console.WriteLine($"[CloseListener] ({listener}) {error}");
+            Logger.Info($"[S@] Close {listener}: {error}");
         }
         
         private ConcurrentDictionary<string, IPAddress[]> m_DnsResult = new ConcurrentDictionary<string, IPAddress[]>();
@@ -207,7 +202,7 @@ namespace OpenGW.Proxy
                 {
                     Stopwatch watch = Stopwatch.StartNew();
                     IPAddress[] result = Dns.GetHostAddressesAsync(hostOrIp).Result;
-                    Console.WriteLine($"Trying to resolve: {hostOrIp} ({watch.Elapsed})");
+                    Logger.Debug($"Trying to resolve: {hostOrIp} ({watch.Elapsed})");
                     return result;
                 });
         }

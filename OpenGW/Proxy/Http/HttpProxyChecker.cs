@@ -73,7 +73,6 @@ namespace OpenGW.Proxy
             }
 
             string request = Encoding.ASCII.GetString(firstBytes.ToArray(), 0, this.m_LastScanPosition + 1);
-            Console.WriteLine(request);
             Match match = s_RegexHttpHeaders.Match(request);
             if (!match.Success)
             {
@@ -89,7 +88,7 @@ namespace OpenGW.Proxy
                 int colonIndex = capture.Value.IndexOf(':');
                 if (colonIndex < 0)
                 {
-                    // TODO: Log a warning: invalid header
+                    Logger.Warn($"Detect invalid HTTP header: {capture.Value}");
                     continue;
                 }
 

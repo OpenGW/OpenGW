@@ -12,6 +12,8 @@ namespace OpenGW
     {
         private static void Main(string[] args)
         {
+            Logger.MinLogLevel = LogLevel.Debug;
+            
             IPEndPoint endPoint = new IPEndPoint(IPAddress.IPv6Loopback, 10080);
 
             ProxyConfiguration configuration = new ProxyConfiguration(endPoint);

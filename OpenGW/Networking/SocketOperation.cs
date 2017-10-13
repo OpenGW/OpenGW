@@ -179,8 +179,9 @@ namespace OpenGW.Networking
             else
             {
                 token.ClientOrServer.OnConnectError(token.GwSocket, saea.SocketError);
-                                
-                // TODO: Should I dispose token.Socket here?
+
+                // UNCERTAIN: Should I dispose token.GwSocket here?
+                token.GwSocket.Close();
             }
             
             // Now the listener socket is closed. Stop accepting.
