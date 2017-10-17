@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Net;
+using System.Threading;
+using OpenGW.Networking;
 
 namespace OpenGW
 {
@@ -6,7 +9,64 @@ namespace OpenGW
     {
         private static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            var server = GWTcpSocket.CreateServer(new IPEndPoint(IPAddress.Loopback, 12345));
+            server.OnAccept += (gwListener, gwAcceptedSocket) => {
+                Console.WriteLine("[S@][OnAccept]");
+                
+                gwAcceptedSocket.OnReceive += (gwSocket, buffer, offset, count) => {
+                    Console.WriteLine($"[S>][OnReceive] Count = {count}");
+                    if (count == 0) {
+                        gwSocket.Close();
+                    }
+                };
+                gwAcceptedSocket.OnReceiveError += (gwSocket, error) => {
+                    Console.WriteLine($"[S>][OnReceiveError] Error = {error}");
+                };
+                gwAcceptedSocket.OnSend += (gwSocket, buffer, offset, count) => {
+                    Console.WriteLine($"[S>][OnSend] Count = {count}");
+                };
+                gwAcceptedSocket.OnSendError += (gwSocket, error, buffer, offset, count) => {
+                    Console.WriteLine($"[S>][OnSendError] Error = {error} (Count = {count})");
+                };
+                gwAcceptedSocket.OnCloseConnection += (gwSocket) => {
+                    Console.WriteLine($"[S>][OnCloseConnection]");
+                };
+
+                gwAcceptedSocket.StartReceive();
+            };
+            server.OnCloseListener += (gwListener) => {
+                Console.WriteLine($"[S@][OnCloseListener]");
+            };
+            server.StartAccept();
+
+
+            var client = GWTcpSocket.CreateClient(new IPEndPoint(IPAddress.Loopback, 12345));
+            client.OnReceive += (gwSocket, buffer, offset, count) => {
+                Console.WriteLine($"[C>][OnReceive] Count = {count}");
+                if (count == 0) {
+                    gwSocket.Close();
+                }
+            };
+            client.OnReceiveError += (gwSocket, error) => {
+                Console.WriteLine($"[C>][OnReceiveError] Error = {error}");
+            };
+            client.OnSend += (gwSocket, buffer, offset, count) => {
+                Console.WriteLine($"[C>][OnSend] Count = {count}");
+            };
+            client.OnSendError += (gwSocket, error, buffer, offset, count) => {
+                Console.WriteLine($"[C>][OnSendError] Error = {error} (Count = {count})");
+            };
+            client.OnCloseConnection += (gwSocket) => {
+                Console.WriteLine($"[C>][OnCloseConnection]");
+            };
+            client.Connect(0);
+            client.StartReceive();
+
+            client.Send(new byte[124], 0, 124);
+            client.Close();
+
+            server.Close();
+            Thread.Sleep(2000);
         }
     }
 }
