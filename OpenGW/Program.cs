@@ -43,6 +43,7 @@ namespace OpenGW
             };
             server.OnCloseListener += (gwListener) => {
                 Console.WriteLine($"{gwListener} OnCloseListener");
+                Environment.Exit(0);
             };
             server.StartAccept();
 
@@ -89,7 +90,7 @@ namespace OpenGW
             server.Close();
 
             Console.ReadKey(true);
-            Console.WriteLine("Exit!");
+            //Console.WriteLine("Exit!");
         }
     }
 }

@@ -110,10 +110,14 @@ namespace OpenGW.Networking
                 }
                 return true;
             }
+            else if (this._connectionStatus == CONNECT_CLOSED) {
+                return true;
+            }
             else {
                 // Now: this.m_CloseCalled == CLOSE_NOT_CALLED
                 return false;
             }
+            
         }
 
 
