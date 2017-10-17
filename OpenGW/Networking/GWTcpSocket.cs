@@ -59,6 +59,8 @@ namespace OpenGW.Networking
         private const int INVALID_ACTIVE_OPERATION_COUNT = -1;  // any value < 0
         private int _activeOperationCount = 0;
 
+        private int _closeInvoked = 0;  // Whether this.Close() is called
+
 
         private bool IncreaseActiveOperationCountIfNotClosed()
         {
@@ -230,24 +232,32 @@ namespace OpenGW.Networking
 
         public void Close()
         {
-#pragma warning disable 420
-            int oldValue = Interlocked.CompareExchange(
-                ref this._connectionStatus,
-                CONNECT_CLOSE_PENDING,
-                CONNECT_SUCCESSFUL);
-#pragma warning restore 420
+            if (Interlocked.CompareExchange(ref this._closeInvoked, 1, 0) != 0) {
+                // TODO: Log warning: Close() again
+                return;
+            }
 
+            Debug.Assert(this._connectionStatus != CONNECT_CLOSE_PENDING);
+            Debug.Assert(this._connectionStatus != CONNECT_CLOSED);
+
+//#pragma warning disable 420
+//            int oldValue = Interlocked.CompareExchange(
+//                ref this._connectionStatus,
+//                CONNECT_CLOSE_PENDING,
+//                CONNECT_SUCCESSFUL);
+//#pragma warning restore 420
+#pragma warning disable 420
+            int oldValue = Interlocked.Exchange(
+                ref this._connectionStatus,
+                CONNECT_CLOSE_PENDING);
+#pragma warning restore 420
+            Debug.Assert(oldValue != CONNECT_CLOSE_PENDING);
+            Debug.Assert(oldValue != CONNECT_CLOSED);
+
+            // TODO: Severe! OnCloseConnection is called even if Connect() failed
             switch (oldValue) {
                 case CONNECT_NOT_ATTEMPTED:
-                    Console.WriteLine("No Connect()/StartAccept(), calling Close() does nothing");  // TODO
-                    return;
                 case CONNECT_FAILED:
-                    return;
-                case CONNECT_CLOSE_PENDING:
-                case CONNECT_CLOSED:
-                    // TODO: Log
-                    Console.WriteLine("Close() again.");
-                    return;
                 case CONNECT_SUCCESSFUL:
                     try {
                         if (this.Type == GWSocketType.TcpClientConnector ||
@@ -258,6 +268,9 @@ namespace OpenGW.Networking
                             Debug.Assert(this.Type == GWSocketType.TcpServerListener);
                             this.Socket.Close();
                         }
+                    }
+                    catch (SocketException ex) when (ex.SocketErrorCode == SocketError.NotConnected) {
+                        // Ignore
                     }
                     catch (Exception ex) {
                         Console.WriteLine(ex);
@@ -328,7 +341,10 @@ namespace OpenGW.Networking
                 gwAcceptedSocket.CheckClose();
             }
             else {
-                gwListener.OnAcceptError?.Invoke(gwListener, error);
+                // Filter OperationAborted here
+                if (error != SocketError.OperationAborted) {
+                    gwListener.OnAcceptError?.Invoke(gwListener, error);
+                }
             }
 
             // Decrease listener's ActiveOperationCount
@@ -416,6 +432,7 @@ namespace OpenGW.Networking
         }
 
         #endregion
+
 
         #region Connect
 
@@ -604,7 +621,7 @@ namespace OpenGW.Networking
 
             saea.UserToken = this;
 
-            InternalStartReceive(saea, true);
+            InternalStartReceive(saea, false);  // TODO: return a values
         }
 
         #endregion
