@@ -10,7 +10,7 @@ namespace OpenGW
     {
         private static void Main(string[] args)
         {
-            const int CLIENT_COUNT = 10;
+            const int CLIENT_COUNT = 100;
 
             var server = GWTcpSocket.CreateServer(new IPEndPoint(IPAddress.Loopback, 12345));
             server.OnAccept += (gwListener, gwAcceptedSocket) => {
@@ -46,6 +46,8 @@ namespace OpenGW
             server.StartAccept();
 
             Parallel.For(0, CLIENT_COUNT, (id) => {
+                Thread.Sleep(id * 2);
+
                 var client = GWTcpSocket.CreateClient(new IPEndPoint(IPAddress.Loopback, 12345));
                 client.OnReceive += (gwSocket, buffer, offset, count) => {
                     Console.WriteLine($"[C>][OnReceive] Count = {count}");
@@ -67,11 +69,12 @@ namespace OpenGW
                 };
                 client.Connect(0);
 
-                client.StartReceive();
-
                 for (int i = 0; i < 10; i++) {
                     client.Send(new byte[124], 0, 124);
                 }
+
+                client.StartReceive();
+
                 client.Close();
             });
 

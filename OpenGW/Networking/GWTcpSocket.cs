@@ -417,6 +417,11 @@ namespace OpenGW.Networking
             else {
                 // TODO: filter the case status == OperationAborted?
                 gwSocket.OnReceiveError?.Invoke(gwSocket, status);
+
+                // Filter the case when the connection is reset
+                if (status == SocketError.ConnectionReset) {
+                    gwSocket.Close();
+                }
             }
 
             Interlocked.Decrement(ref gwSocket._activeOperationCount);
