@@ -147,6 +147,8 @@ namespace OpenGW.Networking
 
             this.Socket.Bind(bindEndPoint);
             this.Socket.Listen(0);
+
+            this.LocalEndPoint = (IPEndPoint)this.Socket.LocalEndPoint;
         }
 
         /// <summary>
@@ -161,6 +163,10 @@ namespace OpenGW.Networking
                   gwListener._acceptedSocketPropertySetter)
         {
             this.TcpServer = gwListener;
+
+            this.LocalEndPoint = (IPEndPoint)this.Socket.LocalEndPoint;
+            this.RemoteEndPoint = (IPEndPoint)this.Socket.RemoteEndPoint;
+
         }
 
 
@@ -207,6 +213,9 @@ namespace OpenGW.Networking
                     throw new SocketException((int)SocketError.TimedOut);
                 }
             }
+
+            this.LocalEndPoint = (IPEndPoint)this.Socket.LocalEndPoint;
+            this.RemoteEndPoint = (IPEndPoint)this.Socket.RemoteEndPoint;
 
             this._connectionStatus = CONNECT_SUCCESSFUL;
         }

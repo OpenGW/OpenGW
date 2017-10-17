@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -9,6 +10,11 @@ namespace OpenGW.Networking
     public abstract class GWSocket
     {
         protected Socket Socket { get; }
+
+        public IPEndPoint LocalEndPoint { get; protected set; }
+
+        public IPEndPoint RemoteEndPoint { get; protected set; }
+
 
         protected GWSocketType Type { get; }
 
@@ -38,5 +44,20 @@ namespace OpenGW.Networking
             this.SocketPropertySetter?.Invoke(socket);
         }
 
+        public override string ToString()
+        {
+            switch (this.Type) {
+                case GWSocketType.TcpServerListener:
+                    return $"(S@ {this.LocalEndPoint})";
+                case GWSocketType.TcpServerConnector:
+                    return $"(S> {this.LocalEndPoint}->{this.RemoteEndPoint})";
+                case GWSocketType.TcpClientConnector:
+                    return $"(S> {this.LocalEndPoint?.ToString() ?? "<null>"}->{this.RemoteEndPoint?.ToString() ?? "<null>"})";
+                case GWSocketType.UdpClient:
+                    return $"(U@ {this.LocalEndPoint})";
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
     }
 }
