@@ -9,18 +9,26 @@ namespace OpenGW
 {
     public static class Program
     {
+        private static int _closeCnt = 0;
+        private static int _acceptCnt = 0;
+        private static int _connectCnt = 0;
+        
         private static void Main(string[] args)
         {
-            const int CLIENT_COUNT = 100;
+            const int CLIENT_COUNT = 50;
 
             var server = GWTcpSocket.CreateServer(new IPEndPoint(IPAddress.IPv6Loopback, 12345));
             server.OnAccept += (gwListener, gwAcceptedSocket) => {
-                Console.WriteLine($"{gwListener} OnAccept: {gwAcceptedSocket}");
+                int cnt = Interlocked.Increment(ref _acceptCnt);
+                Console.WriteLine($"{gwListener} OnAccept: {gwAcceptedSocket} ({cnt})");
                 
                 gwAcceptedSocket.OnReceive += (gwSocket, buffer, offset, count) => {
                     Console.WriteLine($"{gwListener} OnReceive: Count = {count}");
                     if (count == 0) {
                         gwSocket.Close();
+                    }
+                    else {
+                        gwSocket.Send(buffer, offset, count);
                     }
                 };
                 gwAcceptedSocket.OnReceiveError += (gwSocket, error) => {
@@ -39,10 +47,12 @@ namespace OpenGW
                 gwAcceptedSocket.StartReceive();
             };
             server.OnAcceptError += (gwListener, error) => {
-                Console.WriteLine($"{gwListener} OnAcceptError: {error}");
+                int cnt = Interlocked.Increment(ref _acceptCnt);
+                Console.WriteLine($"{gwListener} OnAcceptError: {error} ({cnt})");
             };
             server.OnCloseListener += (gwListener) => {
                 Console.WriteLine($"{gwListener} OnCloseListener");
+                Console.WriteLine("Exit!");
                 Environment.Exit(0);
             };
             server.StartAccept();
@@ -53,9 +63,7 @@ namespace OpenGW
                 var client = GWTcpSocket.CreateClient(new IPEndPoint(IPAddress.IPv6Loopback, 12345));
                 client.OnReceive += (gwSocket, buffer, offset, count) => {
                     Console.WriteLine($"{gwSocket} OnReceive: Count = {count}");
-                    //if (count == 0) {
-                    //    gwSocket.Close();
-                    //}
+                    gwSocket.Close();
                 };
                 client.OnReceiveError += (gwSocket, error) => {
                     Console.WriteLine($"{gwSocket} OnReceiveError: {error}");
@@ -67,30 +75,32 @@ namespace OpenGW
                     Console.WriteLine($"{gwSocket} OnSendError: {error} (Count = {count})");
                 };
                 client.OnCloseConnection += (gwSocket) => {
-                    Console.WriteLine($"{gwSocket} OnCloseConnection");
+                    int cnt = Interlocked.Increment(ref _closeCnt);
+                    Console.WriteLine($"{gwSocket} OnCloseConnection ({cnt})");
+                    if (cnt == CLIENT_COUNT) {
+                        server.Close();
+                    }
                 };
-
-                try {
-                    client.Connect(0);
-                }
-                catch (SocketException ex) {
-                    Console.WriteLine(ex.SocketErrorCode);
-                    return;
-                }
-
-                for (int i = 0; i < 1; i++) {
-                    client.Send(new byte[124], 0, 124);
-                }
-
-                client.StartReceive();
-
-                client.Close();
+                
+                client.OnConnect += (gwSocket) => {
+                    int cnt = Interlocked.Increment(ref _connectCnt);
+                    Console.WriteLine($"{gwSocket} OnConnect ({_connectCnt})");
+                    client.StartReceive();
+                    for (int i = 0; i < 1; i++) {
+                        client.Send(new byte[124], 0, 124);
+                    }
+                    //client.Close();
+                };
+                client.OnConnectError += (gwSocket, error) => {
+                    int cnt = Interlocked.Increment(ref _connectCnt);
+                    Console.WriteLine($"{gwSocket} OnConnectError: {error} ({_connectCnt})");
+                    client.Close();
+                };
+                
+                client.Connect();
             });
 
-            server.Close();
-
             Console.ReadKey(true);
-            //Console.WriteLine("Exit!");
         }
     }
 }
