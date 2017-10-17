@@ -46,7 +46,7 @@ namespace OpenGW.Networking
         private readonly IPEndPoint _connectEndPoint = null;
 
         //
-        // For TcpClientConnector / TcpServerConnector
+        // For all: TcpClientConnector, TcpServerConnector, TcpServerListener
         //
         private const int CONNECT_NOT_ATTEMPTED = 0;
         private const int CONNECT_FAILED = 1;
@@ -57,6 +57,7 @@ namespace OpenGW.Networking
 
         private const int INVALID_ACTIVE_OPERATION_COUNT = -1;  // any value < 0
         private int _activeOperationCount = 0;
+
 
         private bool IncreaseActiveOperationCountIfNotClosed()
         {
@@ -80,7 +81,7 @@ namespace OpenGW.Networking
             }
         }
 
-        private bool CheckCloseConnection()
+        private bool CheckClose()
         {
             if (this._connectionStatus == CONNECT_CLOSE_PENDING) {
                 if (this._activeOperationCount == 0) {
@@ -93,7 +94,18 @@ namespace OpenGW.Networking
                     if (oldValue == 0) {
                         this._connectionStatus = CONNECT_CLOSED;
 
-                        this.OnCloseConnection?.Invoke(this);
+                        switch (this.Type) {
+                            case GWSocketType.TcpServerListener:
+                                this.OnCloseListener?.Invoke(this);
+                                break;
+                            case GWSocketType.TcpServerConnector:
+                            case GWSocketType.TcpClientConnector:
+                                this.OnCloseConnection?.Invoke(this);
+                                break;
+                            case GWSocketType.UdpClient:
+                            default:
+                                throw new ArgumentOutOfRangeException();
+                        }
                     }
                 }
                 return true;
@@ -199,21 +211,19 @@ namespace OpenGW.Networking
             this._connectionStatus = CONNECT_SUCCESSFUL;
         }
 
-        private static void CloseConnector(GWTcpSocket gwSocket)
-        {
-            Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnector ||
-                         gwSocket.Type == GWSocketType.TcpClientConnector);
 
+        public void Close()
+        {
 #pragma warning disable 420
             int oldValue = Interlocked.CompareExchange(
-                ref gwSocket._connectionStatus,
+                ref this._connectionStatus,
                 CONNECT_CLOSE_PENDING,
                 CONNECT_SUCCESSFUL);
 #pragma warning restore 420
 
             switch (oldValue) {
                 case CONNECT_NOT_ATTEMPTED:
-                    Console.WriteLine("No Connect(), calling Close() does nothing");
+                    Console.WriteLine("No Connect()/StartAccept(), calling Close() does nothing");  // TODO
                     return;
                 case CONNECT_FAILED:
                     return;
@@ -224,50 +234,24 @@ namespace OpenGW.Networking
                     return;
                 case CONNECT_SUCCESSFUL:
                     try {
-                        gwSocket.Socket.Disconnect(false);
+                        if (this.Type == GWSocketType.TcpClientConnector ||
+                            this.Type == GWSocketType.TcpServerConnector) {
+                            this.Socket.Disconnect(false);
+                        }
+                        else {
+                            Debug.Assert(this.Type == GWSocketType.TcpServerListener);
+                            this.Socket.Close();
+                        }
                     }
                     catch (Exception ex) {
                         Console.WriteLine(ex);
-                        gwSocket.Socket.Dispose();
+                        this.Socket.Dispose();
                     }
+
+                    bool callClosed = this.CheckClose();
+                    Debug.Assert(callClosed);
+
                     break;
-            }
-
-            bool callClosed = gwSocket.CheckCloseConnection();
-            Debug.Assert(callClosed);
-        }
-
-
-        private static void CloseListener(GWTcpSocket gwSocket)
-        {
-            Debug.Assert(gwSocket.Type == GWSocketType.TcpServerListener);
-
-            try {
-                gwSocket.Socket.Close();
-            }
-            catch (Exception ex) {
-                Console.WriteLine(ex);
-                gwSocket.Socket.Dispose();
-            }
-
-            //bool callClosed = gwSocket.CheckCloseConnection();
-            //Debug.Assert(callClosed);
-        }
-
-
-        public void Close()
-        {
-            switch (this.Type) {
-                case GWSocketType.TcpServerListener:
-                    CloseListener(this);
-                    break;
-                case GWSocketType.TcpServerConnector:
-                case GWSocketType.TcpClientConnector:
-                    CloseConnector(this);
-                    break;
-                case GWSocketType.UdpClient:
-                default:
-                    throw new ArgumentOutOfRangeException();
             }
         }
 
@@ -299,23 +283,44 @@ namespace OpenGW.Networking
 
         #region Accept
 
-        private static void InvokeOnAccept(GWTcpSocket gwListener, GWTcpSocket gwAcceptedSocket)
+        private static void CompleteAccept(GWTcpSocket gwListener, SocketAsyncEventArgs saea, SocketError error)
         {
-            // Setting connect status = CONNECT_EVER_SUCCESSFUL
-            Debug.Assert(gwAcceptedSocket._connectionStatus == CONNECT_NOT_ATTEMPTED);
-            gwAcceptedSocket._connectionStatus = CONNECT_SUCCESSFUL;
+            Debug.Assert(saea.LastOperation == SocketAsyncOperation.Accept);
 
-            // Increase accepted socket's ActiveOperationCount
-            Debug.Assert(gwAcceptedSocket._activeOperationCount == 0);
-            Interlocked.Increment(ref gwAcceptedSocket._activeOperationCount);
-            Debug.Assert(gwAcceptedSocket._activeOperationCount == 1);
+            if (error == SocketError.Success) {
+                // Now we successfully accepted a new socket
+                Debug.Assert(saea.AcceptSocket != null);
+                GWTcpSocket gwAcceptedSocket = new GWTcpSocket(saea.AcceptSocket, gwListener);
 
-            // Invoke OnAccept()
-            gwListener.OnAccept?.Invoke(gwListener, gwAcceptedSocket);
+                // Invoke OnAccept
+                // Setting connect status = CONNECT_EVER_SUCCESSFUL
+                Debug.Assert(gwAcceptedSocket._connectionStatus == CONNECT_NOT_ATTEMPTED);
+                gwAcceptedSocket._connectionStatus = CONNECT_SUCCESSFUL;
 
-            // Decrease accepted socket's ActiveOperationCount
-            Interlocked.Decrement(ref gwAcceptedSocket._activeOperationCount);
-            bool closeCalled = gwAcceptedSocket.CheckCloseConnection();
+                // Increase accepted socket's ActiveOperationCount
+                Debug.Assert(gwAcceptedSocket._activeOperationCount == 0);
+                Interlocked.Increment(ref gwAcceptedSocket._activeOperationCount);
+                Debug.Assert(gwAcceptedSocket._activeOperationCount == 1);
+
+                // Invoke OnAccept()
+                gwListener.OnAccept?.Invoke(gwListener, gwAcceptedSocket);
+
+                // Decrease accepted socket's ActiveOperationCount
+                Interlocked.Decrement(ref gwAcceptedSocket._activeOperationCount);
+                gwAcceptedSocket.CheckClose();
+            }
+            else {
+                gwListener.OnAcceptError?.Invoke(gwListener, error);
+            }
+
+            // Decrease listener's ActiveOperationCount
+            Interlocked.Decrement(ref gwListener._activeOperationCount);
+            bool closeCalled = gwListener.CheckClose();
+            if (!closeCalled) {
+                // Accept the next socket
+                GWTcpSocket.InternalStartAccept(saea);
+            }
+
         }
 
 
@@ -326,28 +331,7 @@ namespace OpenGW.Networking
             GWTcpSocket gwListener = (GWTcpSocket)saea.UserToken;
             Debug.Assert(gwListener.Type == GWSocketType.TcpServerListener);
 
-            if (saea.SocketError == SocketError.Success) {
-                // Now we successfully accepted a new socket
-                Debug.Assert(saea.AcceptSocket != null);
-                GWTcpSocket gwSocket = new GWTcpSocket(saea.AcceptSocket, gwListener);
-
-                // Invoke OnAccept
-                GWTcpSocket.InvokeOnAccept(gwListener, gwSocket);
-
-                // Accept the next socket
-                GWTcpSocket.InternalStartAccept(saea);
-            }
-            else if (saea.SocketError == SocketError.OperationAborted) {
-                // TODO: ?
-                gwListener.OnCloseListener?.Invoke(gwListener);
-            }
-            else {
-                gwListener.OnAcceptError?.Invoke(gwListener, saea.SocketError);
-
-                // Accept the next socket
-                GWTcpSocket.InternalStartAccept(saea);
-            }
-
+            CompleteAccept(gwListener, saea, saea.SocketError);
         }
 
 
@@ -359,6 +343,15 @@ namespace OpenGW.Networking
             GWTcpSocket gwListener = (GWTcpSocket)saea.UserToken;
             Debug.Assert(gwListener.Type == GWSocketType.TcpServerListener);
 
+            Debug.Assert(gwListener._connectionStatus != CONNECT_NOT_ATTEMPTED);
+            Debug.Assert(gwListener._connectionStatus != CONNECT_FAILED);
+
+            if (!gwListener.IncreaseActiveOperationCountIfNotClosed()) {
+
+                saea.Dispose();  // TODO: push into pool?
+                return;
+            }
+
             saea.AcceptSocket = null;
 
             try {
@@ -366,18 +359,10 @@ namespace OpenGW.Networking
                     GWTcpSocket.ProcessAccept(saea);
                 }
             }
-            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.OperationAborted) {
-                // Invoke OnCloseListener()
-                gwListener.OnCloseListener?.Invoke(gwListener);
-            }
             catch (SocketException ex) {
                 Debug.Assert(ex.SocketErrorCode != SocketError.Success);
 
-                // Invoke OnAcceptError()
-                gwListener.OnAcceptError?.Invoke(gwListener, ex.SocketErrorCode);
-
-                // Don't break: just go to accept the next socket!
-                GWTcpSocket.InternalStartAccept(saea);
+                CompleteAccept(gwListener, saea, ex.SocketErrorCode);
             }
         }
 
@@ -385,6 +370,25 @@ namespace OpenGW.Networking
         public void StartAccept()
         {
             Debug.Assert(this.Type == GWSocketType.TcpServerListener);
+
+            int oldValue = Interlocked.CompareExchange(
+                ref this._connectionStatus,
+                CONNECT_SUCCESSFUL,
+                CONNECT_NOT_ATTEMPTED);
+            switch (oldValue) {
+                case CONNECT_NOT_ATTEMPTED:
+                    // This is normal case
+                    break;
+                case CONNECT_SUCCESSFUL:
+                    // TODO: Log warning
+                    Console.WriteLine("This socket has started accepting.");
+                    return;
+                case CONNECT_CLOSE_PENDING:
+                case CONNECT_CLOSED:
+                    throw new InvalidOperationException("This socket has called Close()");
+                case CONNECT_FAILED:
+                    throw new InvalidOperationException("This socket has failed in StartAccept()");
+            }
 
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
             saea.Completed += GWTcpSocket.SocketAsyncEventArgs_OnCompleted;
@@ -416,7 +420,7 @@ namespace OpenGW.Networking
             }
 
             Interlocked.Decrement(ref gwSocket._activeOperationCount);
-            bool closeCalled = gwSocket.CheckCloseConnection();
+            bool closeCalled = gwSocket.CheckClose();
             if (!closeCalled) {
                 InternalStartReceive(saea, false);
             }
@@ -517,7 +521,7 @@ namespace OpenGW.Networking
             }
 
             Interlocked.Decrement(ref gwSocket._activeOperationCount);
-            bool closeCalled = gwSocket.CheckCloseConnection();
+            bool closeCalled = gwSocket.CheckClose();
             saea.Dispose();  // TODO: Recycle
         }
 
