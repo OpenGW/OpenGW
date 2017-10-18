@@ -15,7 +15,7 @@ namespace OpenGW
         
         private static void Main(string[] args)
         {
-            const int CLIENT_COUNT = 10000;
+            const int CLIENT_COUNT = 1000;
 
             var server = GWTcpSocket.CreateServer(new IPEndPoint(IPAddress.IPv6Loopback, 12345));
             server.OnAccept += (gwListener, gwAcceptedSocket) => {

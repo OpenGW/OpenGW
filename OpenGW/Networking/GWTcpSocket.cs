@@ -262,7 +262,7 @@ namespace OpenGW.Networking
                     try {
                         if (this.Type == GWSocketType.TcpClientConnector ||
                             this.Type == GWSocketType.TcpServerConnector) {
-                            this.Socket.Disconnect(false);
+                            this.Disconnect();
                             //this.Socket.Close();
                         }
                         else {
@@ -296,6 +296,9 @@ namespace OpenGW.Networking
                 case SocketAsyncOperation.Connect:
                     GWTcpSocket.ProcessConnect(saea);
                     break;
+                case SocketAsyncOperation.Disconnect:
+                    GWTcpSocket.ProcessDisconnect(saea);
+                    break;
                 case SocketAsyncOperation.Receive:
                     GWTcpSocket.ProcessReceive(saea);
                     break;
@@ -306,7 +309,6 @@ namespace OpenGW.Networking
                 case SocketAsyncOperation.SendTo:
                 case SocketAsyncOperation.ReceiveMessageFrom:
                 case SocketAsyncOperation.SendPackets:
-                case SocketAsyncOperation.Disconnect:
                 case SocketAsyncOperation.None:
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -719,7 +721,58 @@ namespace OpenGW.Networking
         }
 
         #endregion
-        
-        
+
+
+        #region Disconnect
+
+        private static void CompleteDisconnect(GWTcpSocket gwSocket, SocketAsyncEventArgs saea)
+        {
+            gwSocket.Socket.Dispose();
+            saea.Dispose();
+        }
+
+        private static void ProcessDisconnect(SocketAsyncEventArgs saea)
+        {
+            Debug.Assert(saea.LastOperation == SocketAsyncOperation.Disconnect);
+
+            GWTcpSocket gwSocket = (GWTcpSocket)saea.UserToken;
+            Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnector ||
+                         gwSocket.Type == GWSocketType.TcpClientConnector);
+            
+            CompleteDisconnect(gwSocket, saea);
+        }
+
+        private static void InternalStartDisconnect(SocketAsyncEventArgs saea)
+        {
+            GWTcpSocket gwSocket = (GWTcpSocket)saea.UserToken;
+            Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnector ||
+                         gwSocket.Type == GWSocketType.TcpClientConnector);
+
+            try {
+                if (!gwSocket.Socket.DisconnectAsync(saea)) {
+                    ProcessDisconnect(saea);
+                }
+            }
+            catch {
+                CompleteDisconnect(gwSocket, saea);
+            }
+
+        }
+
+        private void Disconnect()
+        {
+            Debug.Assert(this.Type == GWSocketType.TcpServerConnector ||
+                         this.Type == GWSocketType.TcpClientConnector);
+
+            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();  // TODO: Pool
+            saea.Completed += SocketAsyncEventArgs_OnCompleted;
+            saea.UserToken = this;
+
+            saea.DisconnectReuseSocket = false;
+
+            InternalStartDisconnect(saea);
+        }
+
+        #endregion
     }
 }
