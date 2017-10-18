@@ -126,8 +126,7 @@ namespace OpenGW.Networking
                 //}
             }
 
-            Interlocked.Decrement(ref gwSocket._activeOperationCount);
-            bool closeCalled = gwSocket.CheckClose();
+            bool closeCalled = gwSocket.DecreaseActiveOperationCountAndCheckClose();
             if (!closeCalled) {
                 GWUdpSocket.InternalStartReceiveFrom(saea, false);
             }
@@ -223,8 +222,7 @@ namespace OpenGW.Networking
                 gwSocket.OnSendToError?.Invoke(gwSocket, status, saea.Buffer, saea.Offset, saea.BytesTransferred);
             }
 
-            Interlocked.Decrement(ref gwSocket._activeOperationCount);
-            bool closeCalled = gwSocket.CheckClose();
+            gwSocket.DecreaseActiveOperationCountAndCheckClose();
             saea.Dispose();  // TODO: Recycle
         }
 

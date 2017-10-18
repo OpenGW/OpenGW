@@ -60,13 +60,15 @@ namespace OpenGW.Networking
             }
         }
 
-
-        protected abstract void DoClose(int oldConnectionStatus);
+        protected bool DecreaseActiveOperationCountAndCheckClose()
+        {
+            Interlocked.Decrement(ref this._activeOperationCount);
+            return this.CheckClose();
+        }
 
         protected abstract void InvokeCloseCallback();
-
-
-        protected bool CheckClose()
+        
+        private bool CheckClose()
         {
             if (this._connectionStatus == CONNECT_CLOSE_PENDING) {
                 if (this._activeOperationCount == 0) {
@@ -95,6 +97,8 @@ namespace OpenGW.Networking
         }
 
         
+        protected abstract void DoClose(int oldConnectionStatus);
+
         public void Close()
         {
             if (Interlocked.CompareExchange(ref this._closeInvoked, 1, 0) != 0) {

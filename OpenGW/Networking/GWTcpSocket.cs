@@ -254,8 +254,7 @@ namespace OpenGW.Networking
                 gwListener.OnAccept?.Invoke(gwListener, gwAcceptedSocket);
 
                 // Decrease accepted socket's ActiveOperationCount
-                Interlocked.Decrement(ref gwAcceptedSocket._activeOperationCount);
-                gwAcceptedSocket.CheckClose();
+                gwAcceptedSocket.DecreaseActiveOperationCountAndCheckClose();
             }
             else {
                 // Filter OperationAborted here
@@ -265,8 +264,7 @@ namespace OpenGW.Networking
             }
 
             // Decrease listener's ActiveOperationCount
-            Interlocked.Decrement(ref gwListener._activeOperationCount);
-            bool closeCalled = gwListener.CheckClose();
+            bool closeCalled = gwListener.DecreaseActiveOperationCountAndCheckClose();
             if (!closeCalled) {
                 // Accept the next socket
                 GWTcpSocket.InternalStartAccept(saea);
@@ -288,9 +286,6 @@ namespace OpenGW.Networking
 
         private static void InternalStartAccept(SocketAsyncEventArgs saea)
         {
-            Debug.Assert(saea != null);
-            Debug.Assert(saea.UserToken != null);
-
             GWTcpSocket gwListener = (GWTcpSocket)saea.UserToken;
             Debug.Assert(gwListener.Type == GWSocketType.TcpServerListener);
 
@@ -372,8 +367,7 @@ namespace OpenGW.Networking
                 gwSocket.OnConnectError?.Invoke(gwSocket, status);
             }
 
-            Interlocked.Decrement(ref gwSocket._activeOperationCount);
-            bool closeCalled = gwSocket.CheckClose();
+            bool closeCalled = gwSocket.DecreaseActiveOperationCountAndCheckClose();
             saea.Dispose();  // TODO: Recycle
         }
 
@@ -462,8 +456,7 @@ namespace OpenGW.Networking
                 }
             }
 
-            Interlocked.Decrement(ref gwSocket._activeOperationCount);
-            bool closeCalled = gwSocket.CheckClose();
+            bool closeCalled = gwSocket.DecreaseActiveOperationCountAndCheckClose();
             if (!closeCalled) {
                 InternalStartReceive(saea, false);
             }
@@ -563,8 +556,7 @@ namespace OpenGW.Networking
                 gwSocket.OnSendError?.Invoke(gwSocket, status, saea.Buffer, saea.Offset, saea.BytesTransferred);
             }
 
-            Interlocked.Decrement(ref gwSocket._activeOperationCount);
-            bool closeCalled = gwSocket.CheckClose();
+            gwSocket.DecreaseActiveOperationCountAndCheckClose();
             saea.Dispose();  // TODO: Recycle
         }
 
