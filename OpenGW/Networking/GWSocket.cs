@@ -7,8 +7,8 @@ using System.Text;
 using System.Threading;
 
 namespace OpenGW.Networking
-{
-    public abstract class GWSocket
+{   
+    public abstract partial class GWSocket
     {
         public Action<Socket> SocketPropertySetter { get; }
 

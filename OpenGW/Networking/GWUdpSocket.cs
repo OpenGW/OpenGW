@@ -8,6 +8,46 @@ namespace OpenGW.Networking
 {
     public partial class GWUdpSocket : GWSocket
     {
+        private static readonly Pool<SocketAsyncEventArgs> s_SendPool;
+        private static readonly Pool<SocketAsyncEventArgs> s_ReceiveFromPool;
+        private const int RECEIVE_FROM_BUFFER_LENGTH = 65536;
+        
+        static GWUdpSocket()
+        {
+            s_ReceiveFromPool = new Pool<SocketAsyncEventArgs>
+            {
+                Generator = () =>
+                {
+                    SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+                    saea.Completed += GWUdpSocket.SocketAsyncEventArgs_OnCompleted;
+                    saea.SetBuffer(new byte[RECEIVE_FROM_BUFFER_LENGTH], 0, RECEIVE_FROM_BUFFER_LENGTH);
+                    return saea;
+                },
+                Cleaner = (SocketAsyncEventArgs saea) =>
+                {
+                    Debug.Assert(saea.AcceptSocket == null);
+                    saea.UserToken = null;
+                }
+            };
+            
+            s_SendPool = new Pool<SocketAsyncEventArgs>
+            {
+                Generator = () =>
+                {
+                    SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
+                    saea.Completed += GWUdpSocket.SocketAsyncEventArgs_OnCompleted;
+                    return saea;
+                },
+                Cleaner = (SocketAsyncEventArgs saea) =>
+                {
+                    Debug.Assert(saea.AcceptSocket == null);
+                    saea.SetBuffer(null, 0, 0);
+                    saea.UserToken = null;
+                }
+            };
+        }
+        
+        
         public delegate void OnReceiveFromDelegate(GWUdpSocket gwSocket, IPEndPoint remoteEp, byte[] buffer, int offset, int count);
         public delegate void OnReceiveFromErrorDelegate(GWUdpSocket gwSocket, SocketError error);
         public delegate void OnSendToDelegate(GWUdpSocket gwSocket, IPEndPoint remoteEp, byte[] buffer, int offset, int count);
@@ -133,7 +173,7 @@ namespace OpenGW.Networking
                 GWUdpSocket.InternalStartReceiveFrom(saea, false);
             }
             else {
-                saea.Dispose();  // TODO: Recycle
+                s_ReceiveFromPool.Push(saea);
             }
         }
 
@@ -158,7 +198,7 @@ namespace OpenGW.Networking
 
             if (!gwSocket.IncreaseActiveOperationCountIfNotClosed()) {
 
-                saea.Dispose();  // TODO: push into pool
+                s_ReceiveFromPool.Push(saea);
 
                 if (throwIfClosed) {
                     throw new InvalidOperationException("Can't call InternalStartReceiveFrom() as Close() has been called.");
@@ -178,7 +218,7 @@ namespace OpenGW.Networking
                 GWUdpSocket.CompleteReceiveFrom(gwSocket, saea, ex.SocketErrorCode);
             }
             catch {
-                saea.Dispose();  // TODO: push into pool
+                s_ReceiveFromPool.Push(saea);
                 throw;
             }
 
@@ -195,10 +235,7 @@ namespace OpenGW.Networking
                     throw new InvalidOperationException("This socket has failed in Connect()");
             }
 
-            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();  // TODO: Pool
-            saea.SetBuffer(new byte[65536], 0, 65536);
-            saea.Completed += GWUdpSocket.SocketAsyncEventArgs_OnCompleted;
-
+            SocketAsyncEventArgs saea = s_ReceiveFromPool.Pop();
             saea.UserToken = this;
 
             GWUdpSocket.InternalStartReceiveFrom(saea, false);  // TODO: return a values
@@ -227,7 +264,7 @@ namespace OpenGW.Networking
             }
 
             gwSocket.DecreaseActiveOperationCountAndCheckClose();
-            saea.Dispose();  // TODO: Recycle
+            s_SendPool.Push(saea);
         }
 
         private static void ProcessSendTo(SocketAsyncEventArgs saea)
@@ -251,7 +288,7 @@ namespace OpenGW.Networking
 
             if (!gwSocket.IncreaseActiveOperationCountIfNotClosed()) {
 
-                saea.Dispose();  // TODO: push into pool
+                s_SendPool.Push(saea);
 
                 throw new InvalidOperationException("Can't call InternalStartSendTo() as Close() has been called.");
             }
@@ -266,7 +303,7 @@ namespace OpenGW.Networking
                 GWUdpSocket.CompleteSendTo(gwSocket, saea, ex.SocketErrorCode);
             }
             catch {
-                saea.Dispose();  // TODO: push into pool
+                s_SendPool.Push(saea);
                 throw;
             }
 
@@ -284,10 +321,8 @@ namespace OpenGW.Networking
             }
 
 
-            SocketAsyncEventArgs saea = new SocketAsyncEventArgs();  // TODO: Pool
-            saea.Completed += GWUdpSocket.SocketAsyncEventArgs_OnCompleted;
+            SocketAsyncEventArgs saea = s_SendPool.Pop();
             saea.UserToken = this;
-
             saea.RemoteEndPoint = remoteEp;
             saea.SetBuffer(buffer, offset, count);
 
