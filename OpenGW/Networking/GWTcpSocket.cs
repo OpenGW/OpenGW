@@ -38,13 +38,13 @@ namespace OpenGW.Networking
         //
         // For TcpServerListener only
         //
-        private readonly Action<Socket> _acceptedSocketPropertySetter = null;
+        private readonly Action<Socket> m_AcceptedSocketPropertySetter = null;
 
         //
         // For TcpClientConnector only
         //
-        private readonly IPEndPoint _connectEndPoint = null;
-        private int _connectInvoked = 0;
+        private readonly IPEndPoint m_ConnectEndPoint = null;
+        private int m_ConnectInvoked = 0;
         
 
         /// <summary>
@@ -58,7 +58,7 @@ namespace OpenGW.Networking
                 GWSocketType.TcpClientConnector,
                 socketPropertySetter)
         {
-            this._connectEndPoint = connectEndPoint;
+            this.m_ConnectEndPoint = connectEndPoint;
         }
 
         /// <summary>
@@ -73,7 +73,7 @@ namespace OpenGW.Networking
                 GWSocketType.TcpServerListener,
                 socketPropertySetter)
         {
-            this._acceptedSocketPropertySetter = acceptedSocketPropertySetter;
+            this.m_AcceptedSocketPropertySetter = acceptedSocketPropertySetter;
 
             this.Socket.Bind(bindEndPoint);
             this.Socket.Listen(0);
@@ -90,7 +90,7 @@ namespace OpenGW.Networking
             : base(
                   acceptedSocket,
                   GWSocketType.TcpServerConnector,
-                  gwListener._acceptedSocketPropertySetter)
+                  gwListener.m_AcceptedSocketPropertySetter)
         {
             this.TcpServer = gwListener;
 
@@ -162,7 +162,7 @@ namespace OpenGW.Networking
                 case GWSocketType.TcpClientConnector:
                     this.OnCloseConnection?.Invoke(this);
                     break;
-                case GWSocketType.UdpClient:
+                //case GWSocketType.UdpClient:
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -219,11 +219,11 @@ namespace OpenGW.Networking
                 case SocketAsyncOperation.Send:
                     GWTcpSocket.ProcessSend(saea);
                     break;
-                case SocketAsyncOperation.ReceiveFrom:
-                case SocketAsyncOperation.SendTo:
-                case SocketAsyncOperation.ReceiveMessageFrom:
-                case SocketAsyncOperation.SendPackets:
-                case SocketAsyncOperation.None:
+                //case SocketAsyncOperation.ReceiveFrom:
+                //case SocketAsyncOperation.SendTo:
+                //case SocketAsyncOperation.ReceiveMessageFrom:
+                //case SocketAsyncOperation.SendPackets:
+                //case SocketAsyncOperation.None:
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -280,7 +280,7 @@ namespace OpenGW.Networking
             GWTcpSocket gwListener = (GWTcpSocket)saea.UserToken;
             Debug.Assert(gwListener.Type == GWSocketType.TcpServerListener);
 
-            CompleteAccept(gwListener, saea, saea.SocketError);
+            GWTcpSocket.CompleteAccept(gwListener, saea, saea.SocketError);
         }
 
 
@@ -308,7 +308,7 @@ namespace OpenGW.Networking
             catch (SocketException ex) {
                 Debug.Assert(ex.SocketErrorCode != SocketError.Success);
 
-                CompleteAccept(gwListener, saea, ex.SocketErrorCode);
+                GWTcpSocket.CompleteAccept(gwListener, saea, ex.SocketErrorCode);
             }
         }
 
@@ -317,10 +317,12 @@ namespace OpenGW.Networking
         {
             Debug.Assert(this.Type == GWSocketType.TcpServerListener);
 
+#pragma warning disable 420
             int oldValue = Interlocked.CompareExchange(
                 ref this._connectionStatus,
                 CONNECT_SUCCESSFUL,
                 CONNECT_NOT_ATTEMPTED);
+#pragma warning restore 420
             switch (oldValue) {
                 case CONNECT_NOT_ATTEMPTED:
                     // This is normal case
@@ -334,6 +336,8 @@ namespace OpenGW.Networking
                     throw new InvalidOperationException("This socket has called Close()");
                 case CONNECT_FAILED:
                     throw new InvalidOperationException("This socket has failed in StartAccept()");
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
 
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();
@@ -378,7 +382,7 @@ namespace OpenGW.Networking
             GWTcpSocket gwSocket = (GWTcpSocket)saea.UserToken;
             Debug.Assert(gwSocket.Type == GWSocketType.TcpClientConnector);
 
-            CompleteConnect(gwSocket, saea, saea.SocketError);
+            GWTcpSocket.CompleteConnect(gwSocket, saea, saea.SocketError);
         }
 
         private static void InternalStartConnect(SocketAsyncEventArgs saea)
@@ -398,12 +402,12 @@ namespace OpenGW.Networking
 
             try {
                 if (!gwSocket.Socket.ConnectAsync(saea)) {
-                    ProcessConnect(saea);
+                    GWTcpSocket.ProcessConnect(saea);
                 }
             }
             catch (SocketException ex) {
                 Debug.Assert(ex.SocketErrorCode != SocketError.Success);
-                CompleteConnect(gwSocket, saea, ex.SocketErrorCode);
+                GWTcpSocket.CompleteConnect(gwSocket, saea, ex.SocketErrorCode);
             }
             catch {
                 saea.Dispose();  // TODO: push into pool
@@ -416,17 +420,17 @@ namespace OpenGW.Networking
         {
             Debug.Assert(this.Type == GWSocketType.TcpClientConnector);
 
-            if (Interlocked.CompareExchange(ref this._connectInvoked, 1, 0) != 0) {
+            if (Interlocked.CompareExchange(ref this.m_ConnectInvoked, 1, 0) != 0) {
                 throw new InvalidOperationException("Connect() has been called");
             }
 
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();  // TODO: Pool
-            saea.Completed += SocketAsyncEventArgs_OnCompleted;
+            saea.Completed += GWTcpSocket.SocketAsyncEventArgs_OnCompleted;
             saea.UserToken = this;
 
-            saea.RemoteEndPoint = this._connectEndPoint;
+            saea.RemoteEndPoint = this.m_ConnectEndPoint;
 
-            InternalStartConnect(saea);
+            GWTcpSocket.InternalStartConnect(saea);
         }
 
         #endregion
@@ -458,7 +462,7 @@ namespace OpenGW.Networking
 
             bool closeCalled = gwSocket.DecreaseActiveOperationCountAndCheckClose();
             if (!closeCalled) {
-                InternalStartReceive(saea, false);
+                GWTcpSocket.InternalStartReceive(saea, false);
             }
             else {
                 saea.Dispose();  // TODO: Recycle
@@ -474,7 +478,7 @@ namespace OpenGW.Networking
                          gwSocket.Type == GWSocketType.TcpClientConnector);
 
             // NOTE: saea.BytesTransfered can be 0 even if saea.SocketError == Success
-            CompleteReceive(gwSocket, saea, saea.SocketError);
+            GWTcpSocket.CompleteReceive(gwSocket, saea, saea.SocketError);
         }
 
         private static void InternalStartReceive(SocketAsyncEventArgs saea, bool throwIfClosed)
@@ -499,12 +503,12 @@ namespace OpenGW.Networking
 
             try {
                 if (!gwSocket.Socket.ReceiveAsync(saea)) {
-                    ProcessReceive(saea);
+                    GWTcpSocket.ProcessReceive(saea);
                 }
             }
             catch (SocketException ex) {
                 Debug.Assert(ex.SocketErrorCode != SocketError.Success);
-                CompleteReceive(gwSocket, saea, ex.SocketErrorCode);
+                GWTcpSocket.CompleteReceive(gwSocket, saea, ex.SocketErrorCode);
             }
             catch {
                 saea.Dispose();  // TODO: push into pool
@@ -527,11 +531,11 @@ namespace OpenGW.Networking
 
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();  // TODO: Pool
             saea.SetBuffer(new byte[4096], 0, 4096);
-            saea.Completed += SocketAsyncEventArgs_OnCompleted;
+            saea.Completed += GWTcpSocket.SocketAsyncEventArgs_OnCompleted;
 
             saea.UserToken = this;
 
-            InternalStartReceive(saea, false);  // TODO: return a values
+            GWTcpSocket.InternalStartReceive(saea, false);  // TODO: return a values
         }
 
         #endregion
@@ -568,7 +572,7 @@ namespace OpenGW.Networking
             Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnector ||
                          gwSocket.Type == GWSocketType.TcpClientConnector);
 
-            CompleteSend(gwSocket, saea, saea.SocketError);
+            GWTcpSocket.CompleteSend(gwSocket, saea, saea.SocketError);
         }
 
         private static void InternalStartSend(SocketAsyncEventArgs saea)
@@ -590,12 +594,12 @@ namespace OpenGW.Networking
 
             try {
                 if (!gwSocket.Socket.SendAsync(saea)) {
-                    ProcessSend(saea);
+                    GWTcpSocket.ProcessSend(saea);
                 }
             }
             catch (SocketException ex) {
                 Debug.Assert(ex.SocketErrorCode != SocketError.Success);
-                CompleteSend(gwSocket, saea, ex.SocketErrorCode);
+                GWTcpSocket.CompleteSend(gwSocket, saea, ex.SocketErrorCode);
             }
             catch {
                 saea.Dispose();  // TODO: push into pool
@@ -618,12 +622,12 @@ namespace OpenGW.Networking
 
 
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();  // TODO: Pool
-            saea.Completed += SocketAsyncEventArgs_OnCompleted;
+            saea.Completed += GWTcpSocket.SocketAsyncEventArgs_OnCompleted;
             saea.UserToken = this;
 
             saea.SetBuffer(buffer, offset, count);
 
-            InternalStartSend(saea);
+            GWTcpSocket.InternalStartSend(saea);
         }
 
         #endregion
@@ -645,7 +649,7 @@ namespace OpenGW.Networking
             Debug.Assert(gwSocket.Type == GWSocketType.TcpServerConnector ||
                          gwSocket.Type == GWSocketType.TcpClientConnector);
             
-            CompleteDisconnect(gwSocket, saea);
+            GWTcpSocket.CompleteDisconnect(gwSocket, saea);
         }
 
         private static void InternalStartDisconnect(SocketAsyncEventArgs saea)
@@ -656,11 +660,11 @@ namespace OpenGW.Networking
 
             try {
                 if (!gwSocket.Socket.DisconnectAsync(saea)) {
-                    ProcessDisconnect(saea);
+                    GWTcpSocket.ProcessDisconnect(saea);
                 }
             }
             catch {
-                CompleteDisconnect(gwSocket, saea);
+                GWTcpSocket.CompleteDisconnect(gwSocket, saea);
             }
 
         }
@@ -671,12 +675,12 @@ namespace OpenGW.Networking
                          this.Type == GWSocketType.TcpClientConnector);
 
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();  // TODO: Pool
-            saea.Completed += SocketAsyncEventArgs_OnCompleted;
+            saea.Completed += GWTcpSocket.SocketAsyncEventArgs_OnCompleted;
             saea.UserToken = this;
 
             saea.DisconnectReuseSocket = false;
 
-            InternalStartDisconnect(saea);
+            GWTcpSocket.InternalStartDisconnect(saea);
         }
 
         #endregion

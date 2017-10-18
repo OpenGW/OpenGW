@@ -69,14 +69,14 @@ namespace OpenGW.Networking
                 case SocketAsyncOperation.SendTo:
                     GWUdpSocket.ProcessSendTo(saea);
                     break;
-                case SocketAsyncOperation.Accept:
-                case SocketAsyncOperation.Connect:
-                case SocketAsyncOperation.Disconnect:
-                case SocketAsyncOperation.Receive:
-                case SocketAsyncOperation.Send:
-                case SocketAsyncOperation.ReceiveMessageFrom:
-                case SocketAsyncOperation.SendPackets:
-                case SocketAsyncOperation.None:
+                //case SocketAsyncOperation.Accept:
+                //case SocketAsyncOperation.Connect:
+                //case SocketAsyncOperation.Disconnect:
+                //case SocketAsyncOperation.Receive:
+                //case SocketAsyncOperation.Send:
+                //case SocketAsyncOperation.ReceiveMessageFrom:
+                //case SocketAsyncOperation.SendPackets:
+                //case SocketAsyncOperation.None:
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -170,7 +170,7 @@ namespace OpenGW.Networking
                 saea.RemoteEndPoint = new IPEndPoint(IPAddress.IPv6Any, 0);  // TODO: Cache
 
                 if (!gwSocket.Socket.ReceiveFromAsync(saea)) {
-                    ProcessReceiveFrom(saea);
+                    GWUdpSocket.ProcessReceiveFrom(saea);
                 }
             }
             catch (SocketException ex) {
@@ -197,7 +197,7 @@ namespace OpenGW.Networking
 
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();  // TODO: Pool
             saea.SetBuffer(new byte[65536], 0, 65536);
-            saea.Completed += SocketAsyncEventArgs_OnCompleted;
+            saea.Completed += GWUdpSocket.SocketAsyncEventArgs_OnCompleted;
 
             saea.UserToken = this;
 
@@ -237,7 +237,7 @@ namespace OpenGW.Networking
             GWUdpSocket gwSocket = (GWUdpSocket)saea.UserToken;
             Debug.Assert(gwSocket.Type == GWSocketType.UdpClient);
 
-            CompleteSendTo(gwSocket, saea, saea.SocketError);
+            GWUdpSocket.CompleteSendTo(gwSocket, saea, saea.SocketError);
         }
 
         private static void InternalStartSendTo(SocketAsyncEventArgs saea)
@@ -258,12 +258,12 @@ namespace OpenGW.Networking
 
             try {
                 if (!gwSocket.Socket.SendToAsync(saea)) {
-                    ProcessSendTo(saea);
+                    GWUdpSocket.ProcessSendTo(saea);
                 }
             }
             catch (SocketException ex) {
                 Debug.Assert(ex.SocketErrorCode != SocketError.Success);
-                CompleteSendTo(gwSocket, saea, ex.SocketErrorCode);
+                GWUdpSocket.CompleteSendTo(gwSocket, saea, ex.SocketErrorCode);
             }
             catch {
                 saea.Dispose();  // TODO: push into pool
@@ -285,13 +285,13 @@ namespace OpenGW.Networking
 
 
             SocketAsyncEventArgs saea = new SocketAsyncEventArgs();  // TODO: Pool
-            saea.Completed += SocketAsyncEventArgs_OnCompleted;
+            saea.Completed += GWUdpSocket.SocketAsyncEventArgs_OnCompleted;
             saea.UserToken = this;
 
             saea.RemoteEndPoint = remoteEp;
             saea.SetBuffer(buffer, offset, count);
 
-            InternalStartSendTo(saea);
+            GWUdpSocket.InternalStartSendTo(saea);
         }
 
         #endregion

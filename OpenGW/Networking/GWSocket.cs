@@ -10,16 +10,15 @@ namespace OpenGW.Networking
 {
     public abstract class GWSocket
     {
-        protected Socket Socket { get; }
+        public Action<Socket> SocketPropertySetter { get; }
 
         public IPEndPoint LocalEndPoint { get; protected set; }
 
         public IPEndPoint RemoteEndPoint { get; protected set; }
 
+        protected Socket Socket { get; }
 
         protected GWSocketType Type { get; }
-
-        protected Action<Socket> SocketPropertySetter { get; }
 
         
         //
@@ -35,7 +34,7 @@ namespace OpenGW.Networking
         protected const int INVALID_ACTIVE_OPERATION_COUNT = -1;  // any value < 0
         protected int _activeOperationCount = 0;
 
-        protected int _closeInvoked = 0;  // Whether this.Close() is called
+        private int m_CloseInvoked = 0;  // Whether this.Close() is called
         
        
         protected bool IncreaseActiveOperationCountIfNotClosed()
@@ -101,7 +100,7 @@ namespace OpenGW.Networking
 
         public void Close()
         {
-            if (Interlocked.CompareExchange(ref this._closeInvoked, 1, 0) != 0) {
+            if (Interlocked.CompareExchange(ref this.m_CloseInvoked, 1, 0) != 0) {
                 // TODO: Log warning: Close() again
                 return;
             }
