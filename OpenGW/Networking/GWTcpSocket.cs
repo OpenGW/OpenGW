@@ -661,6 +661,7 @@ namespace OpenGW.Networking
 
 
             SocketAsyncEventArgs saea = s_SendPool.Pop();
+            saea.UserToken = this;
             saea.SetBuffer(buffer, offset, count);
 
             GWTcpSocket.InternalStartSend(saea);

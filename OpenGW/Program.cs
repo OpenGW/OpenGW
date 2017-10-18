@@ -162,7 +162,7 @@ namespace OpenGW
 
         private static void Main(string[] args)
         {
-            Program.TestUdp(1000);
+            Program.TestTcp(1000);
         }
     }
 }
