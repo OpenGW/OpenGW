@@ -263,6 +263,7 @@ namespace OpenGW.Networking
                         if (this.Type == GWSocketType.TcpClientConnector ||
                             this.Type == GWSocketType.TcpServerConnector) {
                             this.Socket.Disconnect(false);
+                            //this.Socket.Close();
                         }
                         else {
                             Debug.Assert(this.Type == GWSocketType.TcpServerListener);

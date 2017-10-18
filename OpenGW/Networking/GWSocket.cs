@@ -52,7 +52,7 @@ namespace OpenGW.Networking
                 case GWSocketType.TcpServerConnector:
                     return $"(S> {this.LocalEndPoint}->{this.RemoteEndPoint})";
                 case GWSocketType.TcpClientConnector:
-                    return $"(S> {this.LocalEndPoint?.ToString() ?? "<null>"}->{this.RemoteEndPoint?.ToString() ?? "<null>"})";
+                    return $"(C> {this.LocalEndPoint?.ToString() ?? "<null>"}->{this.RemoteEndPoint?.ToString() ?? "<null>"})";
                 case GWSocketType.UdpClient:
                     return $"(U@ {this.LocalEndPoint})";
                 default:

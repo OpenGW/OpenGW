@@ -15,7 +15,7 @@ namespace OpenGW
         
         private static void Main(string[] args)
         {
-            const int CLIENT_COUNT = 1000;
+            const int CLIENT_COUNT = 10000;
 
             var server = GWTcpSocket.CreateServer(new IPEndPoint(IPAddress.IPv6Loopback, 12345));
             server.OnAccept += (gwListener, gwAcceptedSocket) => {
@@ -23,7 +23,7 @@ namespace OpenGW
                 Console.WriteLine($"{gwListener} OnAccept: {gwAcceptedSocket} ({cnt})");
                 
                 gwAcceptedSocket.OnReceive += (gwSocket, buffer, offset, count) => {
-                    Console.WriteLine($"{gwListener} OnReceive: Count = {count}");
+                    Console.WriteLine($"{gwSocket} OnReceive: Count = {count}");
                     if (count == 0) {
                         gwSocket.Close();
                     }
@@ -32,16 +32,16 @@ namespace OpenGW
                     }
                 };
                 gwAcceptedSocket.OnReceiveError += (gwSocket, error) => {
-                    Console.WriteLine($"{gwListener} OnReceiveError: {error}");
+                    Console.WriteLine($"{gwSocket} OnReceiveError: {error}");
                 };
                 gwAcceptedSocket.OnSend += (gwSocket, buffer, offset, count) => {
-                    Console.WriteLine($"{gwListener} OnSend: Count = {count}");
+                    Console.WriteLine($"{gwSocket} OnSend: Count = {count}");
                 };
                 gwAcceptedSocket.OnSendError += (gwSocket, error, buffer, offset, count) => {
-                    Console.WriteLine($"{gwListener} OnSendError: {error} (Count = {count})");
+                    Console.WriteLine($"{gwSocket} OnSendError: {error} (Count = {count})");
                 };
                 gwAcceptedSocket.OnCloseConnection += (gwSocket) => {
-                    Console.WriteLine($"{gwListener} OnCloseConnection");
+                    Console.WriteLine($"{gwSocket} OnCloseConnection");
                 };
 
                 gwAcceptedSocket.StartReceive();
@@ -57,8 +57,10 @@ namespace OpenGW
             };
             server.StartAccept();
 
-            Parallel.For(0, CLIENT_COUNT, (id) => {
-                Thread.Sleep(id % 40 + 10);
+            ParallelOptions options = new ParallelOptions();
+            options.MaxDegreeOfParallelism = 8;
+            Parallel.For(0, CLIENT_COUNT, options, (id) => {
+                Thread.Sleep(id % 10 + 10);
 
                 var client = GWTcpSocket.CreateClient(new IPEndPoint(IPAddress.IPv6Loopback, 12345));
                 client.OnReceive += (gwSocket, buffer, offset, count) => {
