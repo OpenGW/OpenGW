@@ -45,84 +45,7 @@ namespace OpenGW.Networking
         //
         private readonly IPEndPoint _connectEndPoint = null;
         private int _connectInvoked = 0;
-
-        //
-        // For all: TcpClientConnector, TcpServerConnector, TcpServerListener
-        //
-        private const int CONNECT_NOT_ATTEMPTED = 0;
-        private const int CONNECT_FAILED = 1;
-        private const int CONNECT_SUCCESSFUL = 2;
-        private const int CONNECT_CLOSE_PENDING = 3;
-        private const int CONNECT_CLOSED = 4;
-        private volatile int _connectionStatus = CONNECT_NOT_ATTEMPTED;
-
-        private const int INVALID_ACTIVE_OPERATION_COUNT = -1;  // any value < 0
-        private int _activeOperationCount = 0;
-
-        private int _closeInvoked = 0;  // Whether this.Close() is called
-
-
-        private bool IncreaseActiveOperationCountIfNotClosed()
-        {
-            while (true) {
-
-                if (this._connectionStatus == CONNECT_CLOSE_PENDING ||
-                    this._connectionStatus == CONNECT_CLOSED) {
-                    return false;
-                }
-
-                int oldValue = Volatile.Read(ref this._activeOperationCount);
-                if (oldValue == INVALID_ACTIVE_OPERATION_COUNT) return false;
-                Debug.Assert(oldValue >= 0);
-
-                if (oldValue == Interlocked.CompareExchange(
-                        ref this._activeOperationCount,
-                        oldValue + 1,
-                        oldValue)) {
-                    return true;
-                }
-            }
-        }
-
-        private bool CheckClose()
-        {
-            if (this._connectionStatus == CONNECT_CLOSE_PENDING) {
-                if (this._activeOperationCount == 0) {
-                    int oldValue = Interlocked.CompareExchange(
-                        ref this._activeOperationCount,
-                        INVALID_ACTIVE_OPERATION_COUNT,
-                        0);
-                    Debug.Assert(oldValue != INVALID_ACTIVE_OPERATION_COUNT);
-
-                    if (oldValue == 0) {
-                        this._connectionStatus = CONNECT_CLOSED;
-
-                        switch (this.Type) {
-                            case GWSocketType.TcpServerListener:
-                                this.OnCloseListener?.Invoke(this);
-                                break;
-                            case GWSocketType.TcpServerConnector:
-                            case GWSocketType.TcpClientConnector:
-                                this.OnCloseConnection?.Invoke(this);
-                                break;
-                            case GWSocketType.UdpClient:
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
-                    }
-                }
-                return true;
-            }
-            else if (this._connectionStatus == CONNECT_CLOSED) {
-                return true;
-            }
-            else {
-                // Now: this.m_CloseCalled == CLOSE_NOT_CALLED
-                return false;
-            }
-            
-        }
-
+        
 
         /// <summary>
         /// Create a new TCP client connector
@@ -228,34 +151,26 @@ namespace OpenGW.Networking
             this._connectionStatus = CONNECT_SUCCESSFUL;
         }
         */
-        
 
-        public void Close()
+        protected override void InvokeCloseCallback()
         {
-            if (Interlocked.CompareExchange(ref this._closeInvoked, 1, 0) != 0) {
-                // TODO: Log warning: Close() again
-                return;
+            switch (this.Type) {
+                case GWSocketType.TcpServerListener:
+                    this.OnCloseListener?.Invoke(this);
+                    break;
+                case GWSocketType.TcpServerConnector:
+                case GWSocketType.TcpClientConnector:
+                    this.OnCloseConnection?.Invoke(this);
+                    break;
+                case GWSocketType.UdpClient:
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
+        }
 
-            Debug.Assert(this._connectionStatus != CONNECT_CLOSE_PENDING);
-            Debug.Assert(this._connectionStatus != CONNECT_CLOSED);
-
-//#pragma warning disable 420
-//            int oldValue = Interlocked.CompareExchange(
-//                ref this._connectionStatus,
-//                CONNECT_CLOSE_PENDING,
-//                CONNECT_SUCCESSFUL);
-//#pragma warning restore 420
-#pragma warning disable 420
-            int oldValue = Interlocked.Exchange(
-                ref this._connectionStatus,
-                CONNECT_CLOSE_PENDING);
-#pragma warning restore 420
-            Debug.Assert(oldValue != CONNECT_CLOSE_PENDING);
-            Debug.Assert(oldValue != CONNECT_CLOSED);
-
-            // TODO: Severe! OnCloseConnection is called even if Connect() failed
-            switch (oldValue) {
+        protected override void DoClose(int oldConnectionStatus)
+        {
+            switch (oldConnectionStatus) {
                 case CONNECT_NOT_ATTEMPTED:
                 case CONNECT_FAILED:
                 case CONNECT_SUCCESSFUL:
@@ -278,10 +193,9 @@ namespace OpenGW.Networking
                         this.Socket.Dispose();
                     }
 
-                    bool callClosed = this.CheckClose();
-                    Debug.Assert(callClosed);
-
                     break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
 
@@ -774,5 +688,6 @@ namespace OpenGW.Networking
         }
 
         #endregion
+        
     }
 }
