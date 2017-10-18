@@ -31,6 +31,8 @@ namespace OpenGW.Networking
         {
             this.Socket.Bind(bindEndPoint);
             this.LocalEndPoint = (IPEndPoint)this.Socket.LocalEndPoint;
+
+            this._connectionStatus = CONNECT_SUCCESSFUL;
         }
 
         public static GWUdpSocket CreateUdpServer(
@@ -165,6 +167,8 @@ namespace OpenGW.Networking
             }
 
             try {
+                saea.RemoteEndPoint = new IPEndPoint(IPAddress.IPv6Any, 0);  // TODO: Cache
+
                 if (!gwSocket.Socket.ReceiveFromAsync(saea)) {
                     ProcessReceiveFrom(saea);
                 }

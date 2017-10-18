@@ -13,10 +13,8 @@ namespace OpenGW
         private static int _acceptCnt = 0;
         private static int _connectCnt = 0;
         
-        private static void Main(string[] args)
+        private static void TestTcp(int CLIENT_COUNT)
         {
-            const int CLIENT_COUNT = 1000;
-
             var server = GWTcpSocket.CreateServer(new IPEndPoint(IPAddress.IPv6Loopback, 12345));
             server.OnAccept += (gwListener, gwAcceptedSocket) => {
                 int cnt = Interlocked.Increment(ref _acceptCnt);
@@ -109,6 +107,62 @@ namespace OpenGW
             });
 
             Console.ReadKey(true);
+        }
+
+        private static void TestUdp(int CLIENT_COUNT)
+        {
+            IPEndPoint serverEp = new IPEndPoint(IPAddress.IPv6Loopback, 12345);
+            GWUdpSocket server = GWUdpSocket.CreateUdpServer(serverEp);
+            
+            server.OnReceiveFrom += (gwSocket, remoteEp, buffer, offset, count) =>
+            {
+                Console.WriteLine($"{gwSocket} ReceiveFrom {remoteEp}: Count = {count}");
+                gwSocket.SendTo(remoteEp, buffer, offset, count);
+            };
+            server.OnSendTo += (gwSocket, remoteEp, buffer, offset, count) =>
+            {
+                Console.WriteLine($"{gwSocket} SendTo {remoteEp}: Count = {count}");
+            };
+            server.OnClose += (gwSocket) => {
+                Console.WriteLine("Exit!");
+                Environment.Exit(0);
+            };
+            server.StartReceiveFrom();
+
+            
+            ParallelOptions options = new ParallelOptions();
+            options.MaxDegreeOfParallelism = 8;
+            Parallel.For(0, CLIENT_COUNT, options, (id) =>
+            {
+                Thread.Sleep(id % 10 + 10);
+                GWUdpSocket client = GWUdpSocket.CreateUdpClient(server.LocalEndPoint.AddressFamily);
+                
+                client.OnReceiveFrom += (gwSocket, remoteEp, buffer, offset, count) =>
+                {
+                    Console.WriteLine($"{gwSocket} ReceiveFrom {remoteEp}: Count = {count}");
+                    client.Close();
+                };
+                client.OnSendTo += (gwSocket, remoteEp, buffer, offset, count) =>
+                {
+                    Console.WriteLine($"{gwSocket} SendTo {remoteEp}: Count = {count}");
+                };
+                client.OnClose += (gwSocket) =>
+                {
+                    int cnt = Interlocked.Increment(ref _closeCnt);
+                    Console.WriteLine($"{gwSocket} Close ({_closeCnt})");
+                    if (cnt == CLIENT_COUNT) server.Close();
+                };
+                client.StartReceiveFrom();
+
+                client.SendTo(serverEp, new byte[555], 0, 555);
+            });
+
+            Console.ReadKey();
+        }
+
+        private static void Main(string[] args)
+        {
+            Program.TestUdp(1000);
         }
     }
 }
