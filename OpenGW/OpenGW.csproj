@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -7,5 +7,9 @@
   <ItemGroup>
     <PackageReference Include="DnsClient" Version="1.0.7" />
     <PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Networking" />
+    <Folder Include="Proxu" />
   </ItemGroup>
 </Project>
