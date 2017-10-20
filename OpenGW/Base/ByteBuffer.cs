@@ -41,6 +41,8 @@ namespace OpenGW
 
         public int MaxLength => this.m_Array.Length - this.m_Start;
 
+        public int Capacity => this.m_Array.Length;
+
         public int Length {
             get => this.m_Length;
             set {
