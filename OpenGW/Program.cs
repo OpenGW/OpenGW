@@ -6,18 +6,18 @@ namespace OpenGW
     {
         private static void Main(string[] args)
         {
-            ByteBuffer bb = new ByteBuffer();
+            ByteBuffer bb = new ByteBuffer(1);
 
-            bb.Append(new byte[4] {1, 2, 3, 4}, 0, 4);
+            bb.Append(new byte[1024 * 1024], 0, 65536 * 3 - 1);
             Console.WriteLine(bb);
 
             bb.Start = 4;
             Console.WriteLine(bb);
 
-            --bb.Start;
+            ++bb.Start;
             Console.WriteLine(bb);
 
-            ++bb.Length;
+            --bb.Length;
             Console.WriteLine(bb);
         }
     }

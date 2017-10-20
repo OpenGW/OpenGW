@@ -8,17 +8,27 @@ namespace OpenGW
     public class ByteBuffer : IReusable, IEnumerable<byte>
     {
         private const int MAX_RESISE_INCREMENT = 1024 * 64;  // 64 KB
-
-        private static int CalcNewMaxLength(int currMaxLength, int minRequired)
+        private const int INIT_CAPACITY = 64;
+        
+        private static int CalcNewCapacity(int minRequired)
         {
-            Debug.Assert(currMaxLength >= 0);
-            Debug.Assert(minRequired > currMaxLength);
-
+            int UpperPowerOf2(int n)
+            {
+                n--;
+                n |= n >> 1;
+                n |= n >> 2;
+                n |= n >> 4;
+                n |= n >> 8;
+                n |= n >> 16;
+                n++;
+                return n;
+            }
+            
             if (minRequired > MAX_RESISE_INCREMENT) {
                 return (minRequired + MAX_RESISE_INCREMENT - 1) / MAX_RESISE_INCREMENT * MAX_RESISE_INCREMENT;
             }
             else {
-                return currMaxLength * 2;
+                return UpperPowerOf2(minRequired);
             }
         }
 
@@ -46,7 +56,7 @@ namespace OpenGW
         public int Length {
             get => this.m_Length;
             set {
-                Debug.Assert(value >= 0 && value < this.MaxLength);
+                Debug.Assert(value >= 0 && value <= this.MaxLength);
                 this.m_Length = value;
             }
         }
@@ -70,7 +80,7 @@ namespace OpenGW
 
             int minRequired = this.m_Start + this.m_Length + count;
             if (minRequired > this.m_Array.Length) {
-                System.Array.Resize(ref this.m_Array, CalcNewMaxLength(this.MaxLength, minRequired));
+                System.Array.Resize(ref this.m_Array, ByteBuffer.CalcNewCapacity(minRequired));
             }
 
             System.Array.Copy(buffer, start, this.m_Array, this.m_Start + this.m_Length, count);
@@ -103,14 +113,19 @@ namespace OpenGW
 
         public override string ToString()
         {
-            return $"<Start = {this.m_Start}, Length = {this.m_Length}, MaxLength = {this.MaxLength}>";
+            return $"<Start = {this.m_Start}, Length = {this.m_Length}, Capacity = {this.Capacity}>";
         }
 
-
-
-        public ByteBuffer(int initMaxLength = 64)
+        public ByteBuffer()
         {
-            this.m_Array = new byte[initMaxLength];
+            this.m_Array = new byte[INIT_CAPACITY];
+            this.m_Start = 0;
+            this.m_Length = 0;
+        }
+
+        public ByteBuffer(int initCapacity)
+        {
+            this.m_Array = new byte[ByteBuffer.CalcNewCapacity(initCapacity)];
             this.m_Start = 0;
             this.m_Length = 0;
         }
